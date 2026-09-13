@@ -10,7 +10,7 @@ import re
 import unicodedata
 
 import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from pytesseract import TesseractNotFoundError
 
 
@@ -222,11 +222,6 @@ def _looks_like_cccd(text: str, image: Image.Image) -> bool:
     return identity_markers and (horizontal_card or stacked_sides)
 
 
-def _looks_like_cccd_front(text: str) -> bool:
-    folded = _fold_for_detection(text)
-    return bool(re.search(r"can\s*cuo\W*c", folded) or "citizen identity" in folded)
-
-
 def _split_stacked_cccd(image: Image.Image) -> tuple[Image.Image, Image.Image] | None:
     """Tách ảnh ghép dọc mặt trước/sau CCCD thành hai nửa dạng một mặt thẻ.
 
@@ -286,248 +281,6 @@ def _ocr_cccd_mrz(image: Image.Image, languages: list[str], fallback_language: s
     return ""
 
 
-def _ocr_cccd_front_address_line(
-    image: Image.Image,
-    bounds: tuple[float, float, float, float],
-    language: str,
-) -> str:
-    """Đọc một dòng địa chỉ theo vùng cố định của bố cục CCCD mặt trước."""
-    left_ratio, top_ratio, right_ratio, bottom_ratio = bounds
-    left, top = int(image.width * left_ratio), int(image.height * top_ratio)
-    right, bottom = int(image.width * right_ratio), int(image.height * bottom_ratio)
-    if right <= left or bottom <= top:
-        return ""
-
-    crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
-    if crop.width:
-        scale = min(2.0, 1800 / crop.width)
-        if scale > 1:
-            crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
-    try:
-        text = pytesseract.image_to_string(crop, lang=language, config="--oem 3 --psm 7")
-    except pytesseract.TesseractError:
-        return ""
-    text = re.sub(r"\s+", " ", text).strip()
-    return re.sub(r"^[^0-9A-Za-zÀ-ỹĐđ]+|[^0-9A-Za-zÀ-ỹĐđ.,/\- ]+$", "", text).strip()
-
-
-def _is_cccd_address_line(value: str, *, administrative_line: bool = False) -> bool:
-    """Loại kết quả OCR nhiễu trước khi dùng crop dòng địa chỉ riêng."""
-    folded = _fold_for_detection(value)
-    letters = re.sub(r"[^a-z]", "", folded)
-    if not 5 <= len(value) <= 150 or len(letters) < 4:
-        return False
-    if not administrative_line:
-        return True
-    return bool(re.search(r"\b(?:phuong|xa|thi\s*tran|quan|huyen|tinh|thanh\s*pho|tp)\b", folded))
-
-
-# Hai dòng địa chỉ thường trú in ổn định ở nửa phải dưới của CCCD gắn chip.
-# ``_ocr_cccd_front_address`` và ``_ocr_cccd_front_address_lines`` từng tự
-# OCR lại đúng hai vùng này một cách độc lập (toạ độ lệch nhau chưa tới
-# 0.002, tức cùng một chỗ), tốn gấp đôi số lượt gọi Tesseract một cách vô
-# ích. Dùng chung một cặp toạ độ để hai bên có thể chia sẻ cùng một kết quả
-# OCR mà vẫn tự áp quy tắc xác thực/gắn nhãn riêng của mình.
-_CCCD_ADDRESS_LINE_BOXES: tuple[tuple[float, float, float, float], tuple[float, float, float, float]] = (
-    (0.64, 0.776, 0.95, 0.868),
-    (0.336, 0.837, 0.952, 0.920),
-)
-
-
-def _ocr_cccd_front_address_line_pair(image: Image.Image, language: str) -> tuple[str, str]:
-    """OCR hai dòng địa chỉ thường trú một lần duy nhất, dùng chung cho các bên gọi."""
-    image = ImageOps.exif_transpose(image)
-    first_line = _ocr_cccd_front_address_line(image, _CCCD_ADDRESS_LINE_BOXES[0], language)
-    second_line = _ocr_cccd_front_address_line(image, _CCCD_ADDRESS_LINE_BOXES[1], language)
-    return first_line, second_line
-
-
-def _ocr_cccd_front_address(
-    image: Image.Image,
-    languages: list[str],
-    fallback_language: str,
-    line_pair: tuple[str, str] | None = None,
-) -> str:
-    """Đọc vùng thường trú ở góc phải dưới mặt trước CCCD.
-
-    ``vie+eng`` thường làm rơi dấu ở hai dòng địa chỉ vì bộ nhận dạng tiếng
-    Anh chi phối các tên riêng. Khi có dữ liệu ``vie``, đọc từng dòng bằng PSM
-    7 trước; vùng rộng PSM 6 bên dưới là phương án dự phòng cho ảnh có bố cục
-    lệch hoặc CCCD cũ. ``line_pair`` cho phép nơi gọi (``ocr_pil_image``)
-    truyền kết quả OCR hai dòng đã đọc sẵn thay vì đọc lại.
-    """
-    image = ImageOps.exif_transpose(image)
-    language = "vie" if "vie" in languages else fallback_language
-
-    if "vie" in languages:
-        first_line, second_line = line_pair if line_pair is not None else _ocr_cccd_front_address_line_pair(
-            image, language
-        )
-        if _is_cccd_address_line(first_line) and _is_cccd_address_line(second_line, administrative_line=True):
-            return f"Nơi thường trú: {first_line}\n{second_line}"
-
-    left, top = int(image.width * 0.32), int(image.height * 0.68)
-    right, bottom = int(image.width * 0.98), int(image.height * 0.95)
-    if right <= left or bottom <= top:
-        return ""
-
-    crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
-    crop = ImageEnhance.Contrast(crop).enhance(1.6)
-    crop = crop.filter(ImageFilter.UnsharpMask(radius=1.5, percent=120, threshold=3))
-    if crop.width:
-        scale = min(2.0, 2200 / crop.width)
-        if scale > 1:
-            crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
-
-    try:
-        text = pytesseract.image_to_string(crop, lang=language, config="--oem 3 --psm 6").strip()
-    except pytesseract.TesseractError:
-        return ""
-    folded = _fold_for_detection(text)
-    if "noi thuong tru" in folded or "place of residence" in folded:
-        return text
-    return ""
-
-
-def _clean_cccd_address_line(value: str) -> str:
-    """Remove OCR punctuation around a single CCCD address line.
-
-    The OCR is deliberately not used to "correct" Vietnamese words here: any
-    spelling correction without a trusted source could turn a real address
-    into a different one.  This only discards isolated quotation/dash marks
-    that Tesseract commonly emits at the borders of a tightly cropped line.
-    """
-    value = " ".join(part.strip() for part in value.splitlines() if part.strip())
-    value = re.sub(r"^[^0-9A-Za-zÀ-ỹĐđ]+", "", value)
-    value = value.strip(" \t|`'\"")
-    return re.sub(r"(?:\s*[.\-–—])+\s*$", "", value).strip()
-
-
-def _ocr_cccd_front_address_lines(
-    image: Image.Image,
-    languages: list[str],
-    line_pair: tuple[str, str] | None = None,
-) -> str:
-    """OCR the two printed residence-address lines on a CCCD front side.
-
-    Tesseract's combined ``vie+eng`` model favours the English subtitle on a
-    CCCD and can drop Vietnamese diacritics from the address.  On the standard
-    horizontal front-card layout, narrowly cropped address lines with the
-    Vietnamese model and single-line segmentation preserve them substantially
-    better.  The result is accepted only when both expected address shapes are
-    present; otherwise the regular, wider OCR crop remains the fallback.
-    ``line_pair`` cho phép nơi gọi truyền kết quả OCR hai dòng đã đọc sẵn
-    (xem ``_ocr_cccd_front_address``) thay vì đọc lại đúng vùng ảnh đó.
-    """
-    if "vie" not in languages:
-        return ""
-
-    image = ImageOps.exif_transpose(image)
-    if image.width < 300 or image.height < 180:
-        return ""
-
-    if line_pair is not None:
-        raw_first, raw_second = line_pair
-    else:
-        raw_first, raw_second = _ocr_cccd_front_address_line_pair(image, "vie")
-    first_line, second_line = _clean_cccd_address_line(raw_first), _clean_cccd_address_line(raw_second)
-    first_match = re.search(r"(?<!\d)(\d{1,5}\s*/\s*\d{1,5}\b.*)", first_line)
-    if not first_match:
-        return ""
-    first_line = _clean_cccd_address_line(first_match.group(1))
-    second_folded = _fold_for_detection(second_line)
-    if len(first_line) < 7 or len(second_line) < 8 or not re.search(
-        r"\b(?:phuong|quan|tp|thanh\s*pho|xa|huyen|tinh)\b", second_folded
-    ):
-        return ""
-
-    # Include a stable label so the extraction layer can use its normal,
-    # label-based address parser.  It is still marked for human review there.
-    return f"Nơi thường trú / Place of residence:\n{first_line}\n{second_line}"
-
-
-def _ocr_cccd_front_details(image: Image.Image, languages: list[str], fallback_language: str) -> str:
-    """Read critical fields from fixed regions when whole-card OCR is degraded.
-
-    Glare, security patterns and a portrait cause Tesseract's page segmentation
-    to omit otherwise legible values.  Region OCR is only enabled after the
-    image has already been identified as a CCCD front side.
-    """
-    image = ImageOps.exif_transpose(image)
-    if image.width < 700 or image.height < 400:
-        return ""
-    language = "vie" if "vie" in languages else fallback_language
-
-    def read_region(
-        bounds: tuple[float, float, float, float],
-        *,
-        psm: int,
-        lang: str = language,
-        whitelist: str = "",
-    ) -> str:
-        left, top, right, bottom = (
-            int(image.width * bounds[0]),
-            int(image.height * bounds[1]),
-            int(image.width * bounds[2]),
-            int(image.height * bounds[3]),
-        )
-        crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
-        crop = crop.resize((round(crop.width * 1.5), round(crop.height * 1.5)), Image.Resampling.LANCZOS)
-        config = f"--oem 3 --psm {psm}"
-        if whitelist:
-            config += f" -c tessedit_char_whitelist={whitelist}"
-        try:
-            return pytesseract.image_to_string(crop, lang=lang, config=config).strip()
-        except pytesseract.TesseractError:
-            return ""
-
-    details: list[str] = []
-
-    name_text = read_region((0.27, 0.45, 0.78, 0.62), psm=11)
-    if name_text:
-        # Keep the label and value together; the extraction layer still
-        # validates that the next line has the shape of a Vietnamese name.
-        details.append(name_text)
-
-    numeric_language = "eng" if "eng" in languages else language
-    date_text = read_region(
-        (0.56, 0.58, 0.80, 0.68),
-        psm=7,
-        lang=numeric_language,
-        whitelist="0123456789/.-",
-    )
-    date_match = re.search(r"(?<!\d)(\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2})(?!\d)", date_text)
-    if date_match:
-        details.append(f"Ngày sinh: {date_match.group(1)}")
-
-    gender_text = read_region((0.45, 0.62, 0.72, 0.76), psm=6)
-    gender_folded = _fold_for_detection(gender_text)
-    gender_match = re.search(r"\b(nam|nu)\b", gender_folded)
-    if gender_match:
-        details.append("Giới tính: Nam" if gender_match.group(1) == "nam" else "Giới tính: Nữ")
-
-    address_bounds = (0.27, 0.70, 0.98, 0.99)
-    address_layout = read_region(address_bounds, psm=11, lang="vie+eng" if "eng" in languages and "vie" in languages else language)
-    address_block = read_region(address_bounds, psm=6)
-    first_line = ""
-    for line in address_layout.splitlines():
-        match = re.search(r"(?<!\d)(\d{1,5}\s*/\s*\d{1,5}\b[^\n]{2,80})", line)
-        if match:
-            first_line = _clean_cccd_address_line(match.group(1))
-            first_line = re.sub(r"(?:\s*[-–—])?\s+[A-Za-zÀ-ỹĐđ]$", "", first_line).rstrip(" -–—")
-            break
-    second_line = ""
-    for line in address_block.splitlines():
-        clean_line = _clean_cccd_address_line(line)
-        folded_line = _fold_for_detection(clean_line)
-        if re.search(r"\b(?:phuong|quan|tp|thanh\s*pho|p\.?\s*0?\d)\b", folded_line):
-            second_line = clean_line
-    if first_line and second_line:
-        details.append(f"Nơi thường trú / Place of residence:\n{first_line}\n{second_line}")
-
-    return "\n".join(details)
-
-
 def ocr_pil_image(
     image: Image.Image,
     tesseract_cmd: str | None = None,
@@ -577,62 +330,27 @@ def ocr_pil_image(
 
         # Ảnh ghép dọc mặt trước/sau (một tệp chứa cả hai mặt) có tỉ lệ khung
         # ảnh của cả composite, không phải của một mặt thẻ nằm ngang. Tách đôi
-        # trước khi áp các hàm đọc theo vùng, nếu không toàn bộ tọa độ tương
-        # đối bên dưới sẽ trật, đặc biệt là vùng MRZ và địa chỉ thường trú.
-        front_region, back_region = image, image
+        # trước khi đọc MRZ, nếu không toạ độ tương đối của vùng MRZ (52%-97%
+        # chiều cao ảnh) sẽ trật khỏi mặt sau.
+        back_region = image
         stacked_halves = _split_stacked_cccd(image)
         if stacked_halves is not None:
-            front_region, back_region = stacked_halves
+            _, back_region = stacked_halves
 
-        is_horizontal_card = front_region.height > 0 and 1.30 <= front_region.width / front_region.height <= 2.25
-        run_front_details = (stacked_halves is not None or _looks_like_cccd_front(text)) and is_horizontal_card
-
-        # Mỗi vùng dưới đây là một tiến trình `tesseract` riêng (đo thực tế
-        # 0.4-1.3 giây/lần trên Windows) và không phụ thuộc lẫn nhau, nên chạy
-        # song song thay vì tuần tự giúp giảm đáng kể thời gian OCR một ảnh
-        # CCCD. Kết quả vẫn được xử lý và thêm vào page_texts theo đúng thứ tự
-        # cũ để không đổi hành vi so sánh điểm ở tầng trích xuất.
+        # CPU máy chủ triển khai (vd. Render free 0.1 CPU) quá yếu để chạy nổi
+        # các lượt OCR vùng chuyên biệt (tên/ngày sinh/giới tính/địa chỉ) từng
+        # có ở đây: mỗi lượt là một tiến trình Tesseract riêng, tốn vài giây
+        # bất kể ảnh to hay nhỏ, và một ảnh CCCD có thể kéo theo hơn chục lượt
+        # như vậy. Giờ chỉ giữ lượt đọc bố cục (bổ sung cho lượt đọc chính ở
+        # trên) và MRZ. Đổi lại, một số CCCD chụp lóa sáng/mờ/kiểu cũ có thể
+        # thiếu tên, ngày sinh hoặc địa chỉ và cần người dùng tự nhập bù.
         with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
             layout_future = executor.submit(_layout_call)
-            detail_future = (
-                executor.submit(_ocr_cccd_front_details, front_region, languages, language)
-                if run_front_details
-                else None
-            )
-            # `_ocr_cccd_front_address_lines` và `_ocr_cccd_front_address` xác
-            # thực/gắn nhãn địa chỉ theo hai quy tắc khác nhau nhưng đọc gần
-            # như đúng cùng một cặp vùng ảnh; OCR cặp dòng đó một lần rồi
-            # truyền cho cả hai thay vì mỗi hàm tự đọc lại (xem
-            # `_CCCD_ADDRESS_LINE_BOXES`).
-            address_line_pair_future = (
-                executor.submit(_ocr_cccd_front_address_line_pair, front_region, "vie")
-                if run_front_details and "vie" in languages
-                else None
-            )
             mrz_future = executor.submit(_ocr_cccd_mrz, back_region, languages, language)
 
             layout_text = layout_future.result()
             if layout_text and layout_text not in primary_text:
                 page_texts.append(f"--- CCCD BỐ CỤC ---\n{layout_text}")
-
-            if run_front_details:
-                detail_text = detail_future.result()
-                if detail_text:
-                    page_texts.append(f"--- CCCD CHI TIẾT ---\n{detail_text}")
-                address_line_pair = address_line_pair_future.result() if address_line_pair_future else None
-                detailed_address_text = _ocr_cccd_front_address_lines(
-                    front_region, languages, line_pair=address_line_pair
-                )
-                if detailed_address_text:
-                    # Keep this before the wider crop below.  Both receive the
-                    # same review status/priority; preserving order lets the
-                    # diacritic-friendly result win a score tie in the extractor.
-                    page_texts.append(f"--- CCCD ĐỊA CHỈ RÕ ---\n{detailed_address_text}")
-                address_text = _ocr_cccd_front_address(
-                    front_region, languages, language, line_pair=address_line_pair
-                )
-                if address_text:
-                    page_texts.append(f"--- CCCD ĐỊA CHỈ ---\n{address_text}")
 
             mrz_text = mrz_future.result()
             if mrz_text:
