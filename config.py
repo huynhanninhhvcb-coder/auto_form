@@ -25,6 +25,8 @@ def _find_tesseract() -> str | None:
     candidates = (
         Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
         Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
+        Path("/usr/bin/tesseract"),
+        Path("/usr/local/bin/tesseract"),
     )
     return next((str(candidate) for candidate in candidates if candidate.is_file()), None)
 
