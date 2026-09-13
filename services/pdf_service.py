@@ -35,7 +35,12 @@ def extract_pdf_text(file_path: str | Path, max_pages: int) -> str:
     return _combine_pages(extract_pdf_pages(file_path, max_pages=max_pages))
 
 
-def ocr_pdf(file_path: str | Path, max_pages: int, tesseract_cmd: str | None = None) -> OCRResult:
+def ocr_pdf(
+    file_path: str | Path,
+    max_pages: int,
+    tesseract_cmd: str | None = None,
+    max_workers: int = 5,
+) -> OCRResult:
     try:
         # Tra cứu gói ngôn ngữ một lần cho cả tệp: mỗi lần gọi tốn 150 ms-1 s
         # (đo thực tế trên Windows), nên để mỗi trang tự tra lại sẽ nhân chi
@@ -49,7 +54,7 @@ def ocr_pdf(file_path: str | Path, max_pages: int, tesseract_cmd: str | None = N
                 page = document.load_page(index)
                 pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
                 image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
-                result = ocr_pil_image(image, languages=languages)
+                result = ocr_pil_image(image, languages=languages, max_workers=max_workers)
                 # Một trang CCCD có thể có thêm vùng OCR bố cục/MRZ để parser
                 # ưu tiên thông tin rõ hơn; vẫn chỉ lặp tối đa số trang PDF cho phép.
                 pages.extend(result.pages or [result.text])
@@ -68,7 +73,12 @@ def ocr_pdf(file_path: str | Path, max_pages: int, tesseract_cmd: str | None = N
         raise PDFProcessingError("Tệp PDF không hợp lệ hoặc được bảo vệ.") from error
 
 
-def process_pdf(file_path: str | Path, max_pages: int, tesseract_cmd: str | None = None) -> OCRResult:
+def process_pdf(
+    file_path: str | Path,
+    max_pages: int,
+    tesseract_cmd: str | None = None,
+    max_workers: int = 5,
+) -> OCRResult:
     pages = extract_pdf_pages(file_path, max_pages=max_pages)
     text = _combine_pages(pages)
     if len(text.replace(" ", "")) >= 30:
@@ -78,4 +88,4 @@ def process_pdf(file_path: str | Path, max_pages: int, tesseract_cmd: str | None
         except fitz.FileDataError:
             warnings = []
         return OCRResult(text=text, warnings=warnings, source="pdf_text", pages=pages)
-    return ocr_pdf(file_path, max_pages=max_pages, tesseract_cmd=tesseract_cmd)
+    return ocr_pdf(file_path, max_pages=max_pages, tesseract_cmd=tesseract_cmd, max_workers=max_workers)

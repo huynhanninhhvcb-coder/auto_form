@@ -47,6 +47,13 @@ class Config:
     TEMPLATE_FOLDER = BASE_DIR / "templates_word"
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
     MAX_PDF_PAGES = 8
+    # Số tiến trình Tesseract tối đa chạy song song (nhiều tệp cùng lượt quét,
+    # hoặc nhiều vùng đọc trên một ảnh CCCD). Mặc định 5 tận dụng tốt máy nhiều
+    # lõi khi chạy nội bộ; trên máy chủ cloud chỉ có một phần nhỏ CPU (ví dụ
+    # gói free của Render, ~0.1 CPU), chạy nhiều tiến trình song song khiến mỗi
+    # tiến trình chậm đi rất nhiều thay vì nhanh hơn. Đặt OCR_MAX_WORKERS=1 ở
+    # môi trường đó để buộc chạy tuần tự.
+    OCR_MAX_WORKERS = max(1, int(os.environ.get("OCR_MAX_WORKERS", "5")))
     INTERVIEW_TTL_SECONDS = 30 * 60
     # Có thể ghi đè qua TESSERACT_CMD, ví dụ một bản cài portable.
     TESSERACT_CMD = _find_tesseract()

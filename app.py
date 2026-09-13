@@ -177,9 +177,14 @@ def _process_saved_upload(app: Flask, name: str, filepath: Path, extension: str,
                 filepath,
                 max_pages=app.config["MAX_PDF_PAGES"],
                 tesseract_cmd=app.config.get("TESSERACT_CMD"),
+                max_workers=app.config["OCR_MAX_WORKERS"],
             )
         else:
-            processed = ocr_image(filepath, tesseract_cmd=app.config.get("TESSERACT_CMD"))
+            processed = ocr_image(
+                filepath,
+                tesseract_cmd=app.config.get("TESSERACT_CMD"),
+                max_workers=app.config["OCR_MAX_WORKERS"],
+            )
         extracted = extract_personal_information(
             processed.text,
             page_texts=processed.pages,
@@ -276,7 +281,8 @@ def _extract_batch(app: Flask, uploads: list):
         saved_files.append((index, name, filepath, extension))
 
     if saved_files:
-        with ThreadPoolExecutor(max_workers=len(saved_files)) as executor:
+        batch_workers = min(len(saved_files), app.config["OCR_MAX_WORKERS"])
+        with ThreadPoolExecutor(max_workers=batch_workers) as executor:
             outcomes = list(
                 executor.map(
                     lambda item: _process_saved_upload(app, item[1], item[2], item[3], ai_consented),
@@ -460,9 +466,14 @@ def create_app(test_config: dict | None = None) -> Flask:
                     filepath,
                     max_pages=app.config["MAX_PDF_PAGES"],
                     tesseract_cmd=app.config.get("TESSERACT_CMD"),
+                    max_workers=app.config["OCR_MAX_WORKERS"],
                 )
             else:
-                processed = ocr_image(filepath, tesseract_cmd=app.config.get("TESSERACT_CMD"))
+                processed = ocr_image(
+                    filepath,
+                    tesseract_cmd=app.config.get("TESSERACT_CMD"),
+                    max_workers=app.config["OCR_MAX_WORKERS"],
+                )
             extracted = extract_personal_information(
                 processed.text,
                 page_texts=processed.pages,

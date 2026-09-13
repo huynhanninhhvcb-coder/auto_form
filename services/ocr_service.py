@@ -517,6 +517,7 @@ def ocr_pil_image(
     image: Image.Image,
     tesseract_cmd: str | None = None,
     languages: list[str] | None = None,
+    max_workers: int = 5,
 ) -> OCRResult:
     """OCR một ảnh đã mở.
 
@@ -576,7 +577,7 @@ def ocr_pil_image(
         # song song thay vì tuần tự giúp giảm đáng kể thời gian OCR một ảnh
         # CCCD. Kết quả vẫn được xử lý và thêm vào page_texts theo đúng thứ tự
         # cũ để không đổi hành vi so sánh điểm ở tầng trích xuất.
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
             layout_future = executor.submit(_layout_call)
             detail_future = (
                 executor.submit(_ocr_cccd_front_details, front_region, languages, language)
@@ -630,9 +631,10 @@ def ocr_image(
     image_path: str | Path,
     tesseract_cmd: str | None = None,
     languages: list[str] | None = None,
+    max_workers: int = 5,
 ) -> OCRResult:
     try:
         with Image.open(image_path) as image:
-            return ocr_pil_image(image, tesseract_cmd=tesseract_cmd, languages=languages)
+            return ocr_pil_image(image, tesseract_cmd=tesseract_cmd, languages=languages, max_workers=max_workers)
     except (OSError, ValueError) as error:
         raise ValueError("Tệp ảnh không hợp lệ hoặc bị hỏng.") from error

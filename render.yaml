@@ -13,6 +13,8 @@ services:
         value: gpt-4o-mini
       - key: CHATBOT_AI_ENABLED
         value: "false"
+      - key: OCR_MAX_WORKERS
+        value: "1"
       - key: GOOGLE_DRIVE_API_KEY
         sync: false
       - key: MAU_DON_FOLDER_ID
