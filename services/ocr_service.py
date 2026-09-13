@@ -60,8 +60,17 @@ def _prepare_image(image: Image.Image) -> Image.Image:
     image = ImageOps.exif_transpose(image)
     image = ImageOps.grayscale(image)
     image = ImageOps.autocontrast(image)
-    if image.width < 1800:
-        image = image.resize((image.width * 2, image.height * 2))
+    # Đưa ảnh về một chiều rộng vừa đủ cho Tesseract (~1600px) thay vì luôn
+    # nhân đôi ảnh nhỏ hoặc giữ nguyên ảnh chụp điện thoại độ phân giải cao
+    # (3000-4000px): OCR ảnh lớn không cần thiết là phần tốn CPU nhất trên
+    # máy chủ cấu hình thấp (vd. Render free 0.1 CPU).
+    target_width = 1600
+    if image.width > 0 and image.width != target_width:
+        scale = min(1.4, target_width / image.width)
+        if scale < 0.995 or scale > 1.005:
+            image = image.resize(
+                (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+            )
     return image
 
 
@@ -256,7 +265,7 @@ def _ocr_cccd_mrz(image: Image.Image, languages: list[str], fallback_language: s
 
     crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
     if crop.width:
-        scale = min(3.0, 3600 / crop.width)
+        scale = min(2.0, 2200 / crop.width)
         if scale > 1:
             crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
 
@@ -291,7 +300,7 @@ def _ocr_cccd_front_address_line(
 
     crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
     if crop.width:
-        scale = min(3.0, 2400 / crop.width)
+        scale = min(2.0, 1800 / crop.width)
         if scale > 1:
             crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
     try:
@@ -341,7 +350,7 @@ def _ocr_cccd_front_address(image: Image.Image, languages: list[str], fallback_l
     crop = ImageEnhance.Contrast(crop).enhance(1.6)
     crop = crop.filter(ImageFilter.UnsharpMask(radius=1.5, percent=120, threshold=3))
     if crop.width:
-        scale = min(3.0, 3000 / crop.width)
+        scale = min(2.0, 2200 / crop.width)
         if scale > 1:
             crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
 
@@ -406,7 +415,7 @@ def _ocr_cccd_front_address_lines(image: Image.Image, languages: list[str]) -> s
         crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop(box)))
         if crop.width:
             crop = crop.resize(
-                (crop.width * 3, crop.height * 3),
+                (crop.width * 2, crop.height * 2),
                 Image.Resampling.LANCZOS,
             )
         try:
@@ -457,7 +466,7 @@ def _ocr_cccd_front_details(image: Image.Image, languages: list[str], fallback_l
             int(image.height * bounds[3]),
         )
         crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
-        crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
+        crop = crop.resize((round(crop.width * 1.5), round(crop.height * 1.5)), Image.Resampling.LANCZOS)
         config = f"--oem 3 --psm {psm}"
         if whitelist:
             config += f" -c tessedit_char_whitelist={whitelist}"
