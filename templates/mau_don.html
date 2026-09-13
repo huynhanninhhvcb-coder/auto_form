@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mẫu đơn, tờ khai | Auto Form</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <style>
+      .mau-don-container { max-width: 940px; margin: 0 auto; padding: 56px 24px 80px; }
+      .mau-don-header {
+        background: var(--brand-gradient);
+        color: white;
+        padding: 28px 26px;
+        border-radius: var(--radius-lg);
+        margin-bottom: 26px;
+        box-shadow: var(--shadow-md);
+      }
+      .mau-don-header h1 { font-family: var(--font-display); font-size: 1.3rem; margin: 0; }
+      .mau-don-header p { margin: 6px 0 0; opacity: .92; font-size: .92rem; }
+      .mau-don-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+      .mau-don-folder {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        text-align: left;
+        padding: 18px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        color: var(--ink);
+        box-shadow: var(--shadow-sm);
+        transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+      }
+      .mau-don-folder:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--brand);
+      }
+      .mau-don-folder-icon { font-size: 1.7rem; flex: 0 0 auto; }
+      .mau-don-folder-name { color: var(--brand-dark); }
+      .mau-don-notice {
+        background: var(--warning-bg);
+        color: var(--warning);
+        border: 1px solid var(--warning-line);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        margin-bottom: 24px;
+        font-size: .9rem;
+      }
+      .mau-don-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--brand-dark);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: .9rem;
+      }
+      .mau-don-back:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <main class="mau-don-container">
+      <div class="mau-don-header">
+        <h1>📄 Mẫu đơn, tờ khai</h1>
+        <p>Chọn loại mẫu đơn bạn cần tải về. Mỗi mục sẽ mở thư mục tương ứng trên Google Drive trong tab mới.</p>
+      </div>
+
+      {% if error %}
+      <div class="mau-don-notice">⚠️ {{ error }}</div>
+      {% endif %}
+
+      <div class="mau-don-grid">
+        {% for folder in folders %}
+        <button type="button" class="mau-don-folder" onclick="window.open('https://drive.google.com/drive/folders/{{ folder.id }}', '_blank', 'noopener')">
+          <span class="mau-don-folder-icon" aria-hidden="true">📁</span>
+          <span class="mau-don-folder-name">{{ folder.name }}</span>
+        </button>
+        {% else %}
+          {% if not error %}
+          <div class="mau-don-notice">📭 Không tìm thấy folder mẫu đơn nào. Hãy đảm bảo thư mục được chia sẻ công khai.</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <a href="/" class="mau-don-back">← Quay lại Auto Form</a>
+    </main>
+  </body>
+</html>

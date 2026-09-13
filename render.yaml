@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: auto-form
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: AUTO_FORM_SECRET_KEY
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: CHATBOT_AI_ENABLED
+        value: "false"
+      - key: GOOGLE_DRIVE_API_KEY
+        sync: false
+      - key: MAU_DON_FOLDER_ID
+        sync: false

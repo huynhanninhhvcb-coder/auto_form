@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.example
+__pycache__/
+*.pyc
+uploads/
+outputs/
+tests/
+test_ocr.py
+README.md
+venv/
+.venv/
+auto_form/

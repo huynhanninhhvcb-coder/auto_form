@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Trích xuất thông tin từ PDF hoặc ảnh để hỗ trợ điền biểu mẫu hành chính."
+    />
+    <meta name="theme-color" content="#cf7856" />
+    <title>Điền đơn hỗ trợ | Auto Form</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23cf7856'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/chatbot-widget.css') }}"
+    />
+  </head>
+  <body>
+    <main class="container">
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">DỊCH VỤ HỖ TRỢ</p>
+        <h1 id="page-title">Điền đơn tự động</h1>
+        <p>
+          Tải giấy tờ để trích xuất thông tin hoặc trả lời từng câu hỏi với trợ
+          lý để tạo đơn.
+        </p>
+      </section>
+
+      <ol class="steps" aria-label="Các bước thực hiện">
+        <li><span>1</span>Cung cấp thông tin</li>
+        <li><span>2</span>Kiểm tra thông tin</li>
+        <li><span>3</span>Tải biểu mẫu</li>
+      </ol>
+
+      <section class="card upload-card" aria-labelledby="upload-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">BƯỚC 1</p>
+            <h2 id="upload-title">Chọn tài liệu nguồn</h2>
+          </div>
+          <span class="supported">2 CÁCH THỰC HIỆN</span>
+        </div>
+
+        <div
+          class="method-switch"
+          role="tablist"
+          aria-label="Cách cung cấp thông tin"
+        >
+          <button
+            class="method-button active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-method="scan"
+          >
+            Tải ảnh hoặc PDF
+          </button>
+          <button
+            class="method-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-method="interview"
+          >
+            Trợ lý phỏng vấn
+          </button>
+        </div>
+
+        <div class="template-select-row">
+          <label class="field-label" for="template-id"
+            >Biểu mẫu cần điền</label
+          >
+          <select id="template-id" name="template_id">
+            {% for template in templates %}
+            <option value="{{ template.id }}">{{ template.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div id="scan-panel">
+          <form id="upload-form" novalidate>
+            <input
+              id="file-input"
+              name="files"
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              multiple
+              aria-describedby="file-constraints"
+              hidden
+            />
+            <label class="drop-zone" for="file-input" id="drop-zone">
+              <span class="upload-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"
+                  ></path>
+                  <polyline points="16 16 12 12 8 16"></polyline>
+                  <line x1="12" y1="12" x2="12" y2="21"></line>
+                </svg>
+              </span>
+              <strong id="file-name">Chọn một hoặc nhiều ảnh/PDF</strong>
+              <span id="file-constraints"
+                >Kéo thả tệp vào đây hoặc bấm để chọn · tối đa 5 tệp, 12 MB mỗi
+                tệp, 60 MB mỗi lượt</span
+              >
+            </label>
+            <section
+              id="selected-file-panel"
+              class="selected-file-panel"
+              aria-live="polite"
+              hidden
+            >
+              <div class="selected-file-heading">
+                <strong id="file-selection-summary">Các tệp đã chọn</strong>
+                <button
+                  id="clear-files-button"
+                  class="file-clear-button"
+                  type="button"
+                >
+                  Bỏ tất cả
+                </button>
+              </div>
+              <ul
+                id="file-list"
+                class="file-list"
+                aria-label="Danh sách tệp đã chọn"
+              ></ul>
+            </section>
+            {% if ai_configured %}
+            <label class="ai-consent" for="use-ai">
+              <input id="use-ai" name="use_ai" type="checkbox" value="1" />
+              <span>
+                <strong>Cho phép AI hỗ trợ nhận diện</strong>
+                <small
+                  >Chỉ bật khi bạn đồng ý gửi ảnh/PDF tới OpenAI. OCR Tesseract
+                  vẫn hoạt động khi không bật.</small
+                >
+              </span>
+            </label>
+            {% endif %}
+            <button class="button primary" id="extract-button" type="submit">
+              <span class="button-label">Trích xuất thông tin</span>
+            </button>
+          </form>
+          <p class="privacy-note">
+            Tệp tạm trên máy chủ được tự động xóa sau xử lý. Khi bật AI, nội
+            dung tài liệu được gửi tới OpenAI để nhận diện. Hãy tự kiểm tra
+            thông tin trước khi sử dụng.
+          </p>
+        </div>
+
+        <section
+          id="interview-panel"
+          class="interview-panel"
+          hidden
+          aria-labelledby="interview-title"
+        >
+          <div class="interview-intro">
+            <div>
+              <h3 id="interview-title">Trợ lý phỏng vấn điền đơn</h3>
+              <p>
+                Không có giấy tờ để quét? Trợ lý sẽ đọc từng câu hỏi; bạn trả
+                lời trực tiếp bằng giọng nói. Có thể nói “bỏ qua” với trường
+                không bắt buộc.
+              </p>
+            </div>
+            <span class="local-badge">Giọng nói tiếng Việt</span>
+          </div>
+          <button class="button primary" id="interview-start" type="button">
+            <span class="button-label">Bắt đầu phỏng vấn</span>
+          </button>
+          <div id="interview-progress" class="interview-progress" hidden></div>
+          <div
+            id="interview-chat"
+            class="chat-log"
+            aria-live="polite"
+            hidden
+          ></div>
+          <div id="voice-controls" class="voice-controls" hidden>
+            <button
+              class="button primary voice-answer-button"
+              id="voice-answer-button"
+              type="button"
+              aria-pressed="false"
+            >
+              <span class="mic-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+                  ></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg> </span
+              ><span class="button-label">Bấm để trả lời bằng giọng nói</span>
+            </button>
+            <button
+              class="secondary-button"
+              id="repeat-question-button"
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              </svg>
+              Nghe lại câu hỏi
+            </button>
+            <p
+              id="voice-output-status"
+              class="voice-output-status"
+              role="status"
+              aria-live="polite"
+            >
+              Đang kiểm tra giọng đọc tiếng Việt…
+            </p>
+            <p
+              id="voice-status"
+              class="voice-status"
+              role="status"
+              aria-live="polite"
+            >
+              Sẵn sàng nhận câu trả lời bằng tiếng Việt.
+            </p>
+            <p id="voice-transcript" class="voice-transcript" hidden></p>
+            <div
+              id="voice-confirm-controls"
+              class="voice-confirm-controls"
+              hidden
+            >
+              <p>
+                Hãy kiểm tra nội dung vừa nhận dạng trước khi lưu câu trả lời
+                này.
+              </p>
+              <button
+                class="button primary"
+                id="voice-confirm-button"
+                type="button"
+              >
+                <span class="button-label">Xác nhận câu trả lời</span>
+              </button>
+              <button
+                class="secondary-button"
+                id="voice-retry-button"
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+                  ></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                Nói lại
+              </button>
+            </div>
+          </div>
+          <details id="keyboard-fallback" class="keyboard-fallback" hidden>
+            <summary>
+              Không thể dùng micro? Nhập câu trả lời bằng bàn phím
+            </summary>
+            <form id="interview-form" class="chat-answer">
+              <label class="sr-only" for="interview-answer"
+                >Câu trả lời của bạn</label
+              >
+              <input
+                id="interview-answer"
+                autocomplete="off"
+                placeholder="Nhập câu trả lời của bạn…"
+              />
+              <button class="button primary" id="interview-send" type="submit">
+                <span class="button-label">Gửi</span>
+              </button>
+            </form>
+          </details>
+          <p class="privacy-note">
+            Âm thanh được trình duyệt xử lý bằng dịch vụ nhận dạng giọng nói của
+            thiết bị/trình duyệt; máy chủ không lưu tệp âm thanh. Thông tin đã
+            nhận chỉ giữ tạm trong bộ nhớ tối đa 30 phút.
+          </p>
+        </section>
+      </section>
+
+      <div
+        id="status"
+        class="status"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+
+      <section
+        id="review-section"
+        class="card review-card"
+        hidden
+        aria-labelledby="review-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">BƯỚC 2</p>
+            <h2 id="review-title">Kiểm tra thông tin</h2>
+          </div>
+          <span class="review-badge">Cần xác nhận</span>
+        </div>
+        <p class="review-intro">
+          Các ô dưới đây là gợi ý từ tài liệu. Vui lòng sửa mọi thông tin chưa
+          chính xác trước khi tạo đơn.
+        </p>
+
+        <form id="data-form" novalidate>
+          <div class="form-grid">
+            <label class="input-group wide"
+              >Họ và tên <em>*</em
+              ><input name="full_name" autocomplete="name" required
+            /></label>
+            <label class="input-group"
+              >Ngày sinh <em>*</em
+              ><input
+                name="date_of_birth"
+                placeholder="dd/mm/yyyy"
+                inputmode="numeric"
+                required
+            /></label>
+            <label class="input-group"
+              >Số CCCD / định danh <em>*</em
+              ><input
+                name="citizen_id"
+                inputmode="numeric"
+                maxlength="12"
+                required
+            /></label>
+            <label class="input-group wide"
+              >Nơi cư trú <em>*</em><input name="residence_address" required
+            /></label>
+            <label class="input-group"
+              >Số điện thoại<input name="phone_number" inputmode="tel"
+            /></label>
+          </div>
+
+          <div
+            class="form-grid template-fields"
+            data-template="tro_cap_huu_tri"
+          >
+            <label class="input-group"
+              >Giới tính
+              <select name="gender">
+                <option value="">-- Chọn --</option>
+                <option>Nam</option>
+                <option>Nữ</option>
+                <option>Khác</option>
+              </select>
+            </label>
+            <label class="input-group"
+              >Dân tộc<input name="ethnic_group"
+            /></label>
+            <label class="input-group wide"
+              >Địa chỉ liên lạc<input name="contact_address"
+            /></label>
+            <label class="input-group"
+              >Nơi đề nghị nhận trợ cấp<input name="benefit_receiving_location"
+            /></label>
+          </div>
+
+          <div
+            class="form-grid template-fields"
+            data-template="ho_tro_hoa_tang ho_tro_mai_tang"
+            hidden
+          >
+            <label class="input-group wide"
+              >Họ và tên người mất <em>*</em
+              ><input name="deceased_full_name" required
+            /></label>
+            <label class="input-group"
+              >Ngày mất <em>*</em
+              ><input
+                name="deceased_death_date"
+                placeholder="dd/mm/yyyy"
+                inputmode="numeric"
+                required
+            /></label>
+            <label class="input-group"
+              >Quan hệ với người mất<input name="deceased_relationship"
+            /></label>
+            <label class="input-group wide"
+              >Hoặc đại diện cho tổ chức (nếu có)<input name="org_name"
+            /></label>
+            <label class="input-group"
+              >Số giấy chứng tử/báo tử<input name="death_certificate_number"
+            /></label>
+            <label class="input-group"
+              >Ngày cấp<input
+                name="death_certificate_date"
+                placeholder="dd/mm/yyyy"
+                inputmode="numeric"
+            /></label>
+            <label class="input-group wide"
+              >Nơi cấp giấy chứng tử/báo tử<input
+                name="death_certificate_issuer"
+            /></label>
+          </div>
+
+          <div
+            class="form-grid template-fields"
+            data-template="ho_tro_mai_tang"
+            hidden
+          >
+            <label class="input-group"
+              >Ngày sinh người mất<input
+                name="deceased_date_of_birth"
+                placeholder="dd/mm/yyyy"
+                inputmode="numeric"
+            /></label>
+            <label class="input-group"
+              >Giới tính người mất
+              <select name="deceased_gender">
+                <option value="">-- Chọn --</option>
+                <option>Nam</option>
+                <option>Nữ</option>
+              </select>
+            </label>
+            <label class="input-group"
+              >Dân tộc người mất<input name="deceased_ethnic_group"
+            /></label>
+            <label class="input-group"
+              >Quốc tịch người mất<input
+                name="deceased_nationality"
+                value="Việt Nam"
+            /></label>
+            <label class="input-group wide"
+              >Nơi cư trú người mất<input name="deceased_residence_address"
+            /></label>
+            <label class="input-group"
+              >CCCD/định danh người mất<input
+                name="deceased_citizen_id"
+                inputmode="numeric"
+                maxlength="12"
+            /></label>
+            <label class="input-group"
+              >Nơi mất<input name="deceased_death_place"
+            /></label>
+            <label class="input-group wide"
+              >Nguyên nhân mất<input name="deceased_death_cause"
+            /></label>
+          </div>
+
+          <details
+            class="optional-fields template-fields"
+            data-template="ho_tro_mai_tang"
+            hidden
+          >
+            <summary>
+              Trường hợp cơ quan, tổ chức đứng ra tổ chức mai táng (nếu có)
+            </summary>
+            <div class="form-grid details-grid">
+              <label class="input-group wide"
+                >Địa chỉ tổ chức<input name="org_address"
+              /></label>
+              <label class="input-group"
+                >Người đại diện theo pháp luật<input
+                  name="org_representative_name"
+              /></label>
+              <label class="input-group"
+                >Chức vụ người đại diện<input name="org_representative_title"
+              /></label>
+              <label class="input-group"
+                >Số điện thoại tổ chức<input name="org_phone" inputmode="tel"
+              /></label>
+            </div>
+          </details>
+
+          <section class="bank-details" aria-labelledby="bank-details-title">
+            <div class="subsection-heading">
+              <div>
+                <h3 id="bank-details-title">
+                  10. Thông tin tài khoản ngân hàng
+                </h3>
+                <p>
+                  Nếu nhận trợ cấp qua tài khoản, vui lòng khai đủ cả ba mục bên
+                  dưới.
+                </p>
+              </div>
+              <span class="optional-badge">Không bắt buộc</span>
+            </div>
+            <div class="form-grid bank-grid">
+              <label class="input-group"
+                >Tên chủ tài khoản<input
+                  name="bank_account_name"
+                  autocomplete="name"
+              /></label>
+              <label class="input-group"
+                >Số tài khoản<input
+                  name="bank_account_number"
+                  inputmode="numeric"
+                  maxlength="19"
+                  aria-describedby="bank-account-number-help"
+              /></label>
+              <p class="input-help" id="bank-account-number-help">
+                Chỉ nhập chữ số, từ 6 đến 19 số.
+              </p>
+              <label class="input-group wide"
+                >Ngân hàng<input name="bank_name" autocomplete="organization"
+              /></label>
+            </div>
+          </section>
+
+          <details
+            class="optional-fields template-fields"
+            data-template="tro_cap_huu_tri"
+          >
+            <summary>Thông tin người giám hộ/ủy quyền (nếu có)</summary>
+            <div class="form-grid details-grid">
+              <label class="input-group wide"
+                >Họ tên người giám hộ/ủy quyền<input name="guardian_full_name"
+              /></label>
+              <label class="input-group"
+                >Ngày sinh người giám hộ<input
+                  name="guardian_date_of_birth"
+                  placeholder="dd/mm/yyyy"
+                  inputmode="numeric"
+              /></label>
+              <label class="input-group"
+                >CCCD người giám hộ<input
+                  name="guardian_citizen_id"
+                  inputmode="numeric"
+                  maxlength="12"
+              /></label>
+              <label class="input-group wide"
+                >Địa chỉ người giám hộ<input name="guardian_address"
+              /></label>
+              <label class="input-group"
+                >Số điện thoại người giám hộ<input
+                  name="guardian_phone"
+                  inputmode="tel"
+              /></label>
+              <label class="input-group"
+                >Quan hệ với người đề nghị<input name="guardian_relationship"
+              /></label>
+            </div>
+          </details>
+
+          <div class="generate-row">
+            <div>
+              <strong>BƯỚC 3 — Tạo tệp biểu mẫu</strong
+              ><span
+                >Tệp sẽ được tải về máy và không lưu lại trên máy chủ.</span
+              >
+            </div>
+            <div class="export-actions">
+              <button class="button primary" id="generate-button" type="submit">
+                <span class="button-label">Tải biểu mẫu Word</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+    <footer>
+      Auto Form chỉ hỗ trợ nhập liệu; người nộp đơn chịu trách nhiệm xác nhận
+      thông tin cuối cùng.
+    </footer>
+
+    <div id="chatbot-widget" class="chatbot-widget">
+      <button
+        id="chatbot-toggle"
+        class="chatbot-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="chatbot-panel"
+        aria-label="Mở trợ lý thủ tục hành chính"
+      >
+        <span aria-hidden="true">🤖</span>
+      </button>
+
+      <section
+        id="chatbot-panel"
+        class="chatbot-panel"
+        hidden
+        aria-label="Trợ lý thủ tục hành chính"
+      >
+        <header class="chatbot-panel-header">
+          <div class="chatbot-panel-title">
+            <div>
+              <strong>Trợ lý thủ tục hành chính</strong>
+              <span>Hỏi bằng giọng nói hoặc gõ câu hỏi</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="chatbot-close"
+            class="chatbot-icon-button"
+            aria-label="Đóng trợ lý"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div class="chatbot-voice-status">
+          <span class="chatbot-status-dot" id="chatbot-status-dot"></span>
+          <span id="chatbot-status-text">Sẵn sàng</span>
+        </div>
+
+        <div class="chatbot-function-buttons">
+          <button type="button" class="chatbot-func-btn" id="chatbot-bhyt-btn">
+            🏥 Tra cứu BHYT
+          </button>
+          <button
+            type="button"
+            class="chatbot-func-btn"
+            id="chatbot-maudon-btn"
+          >
+            📄 Mẫu đơn
+          </button>
+          <button
+            type="button"
+            class="chatbot-func-btn"
+            id="chatbot-khupho-btn"
+          >
+            🗺️ Khu phố
+          </button>
+          <button
+            type="button"
+            class="chatbot-func-btn"
+            id="chatbot-danhsach-btn"
+          >
+            📑 Danh sách thủ tục
+          </button>
+        </div>
+
+        <div
+          class="chatbot-messages"
+          id="chatbot-messages"
+          aria-live="polite"
+        ></div>
+
+        <div class="chatbot-input-area">
+          <div class="chatbot-text-row">
+            <label class="sr-only" for="chatbot-text-input"
+              >Câu hỏi của bạn</label
+            >
+            <input
+              type="text"
+              id="chatbot-text-input"
+              class="chatbot-text-input"
+              placeholder="Nhập câu hỏi của bạn…"
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              class="chatbot-send-btn"
+              id="chatbot-send-btn"
+              aria-label="Gửi"
+            >
+              ➤
+            </button>
+            <button
+              type="button"
+              class="chatbot-mic-btn"
+              id="chatbot-mic-btn"
+              aria-label="Trả lời bằng giọng nói"
+            >
+              🎤
+            </button>
+          </div>
+          <button
+            type="button"
+            class="chatbot-clear-btn"
+            id="chatbot-clear-btn"
+          >
+            🗑️ Xóa hội thoại
+          </button>
+        </div>
+      </section>
+    </div>
+    <script>
+      window.AUTO_FORM_CHATBOT_PROCEDURES = {{ danh_sach_thutuc | tojson }};
+    </script>
+    <script
+      src="{{ url_for('static', filename='js/chatbot-widget.js') }}"
+      defer
+    ></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </body>
+</html>
