@@ -19,7 +19,15 @@ ENV PYTHONUNBUFFERED=1 \
     OCR_MAX_WORKERS=1 \
     OCR_TARGET_WIDTH=1200 \
     OCR_LANGUAGE=vie \
-    OCR_FAST_MODE=true
+    OCR_FAST_MODE=true \
+    OMP_THREAD_LIMIT=1 \
+    OMP_NUM_THREADS=1
+# Tesseract build sẵn trên Debian bật OpenMP cho mạng LSTM: mặc định nó tự
+# spawn một luồng cho mỗi lõi mà /proc/cpuinfo báo cáo, kể cả khi cgroup chỉ
+# cấp 0.1 CPU thật sự (Render free). Máy chủ vẫn thấy nhiều lõi ảo nên
+# Tesseract tạo hàng chục luồng tranh nhau một phần CPU rất nhỏ, làm một lượt
+# OCR chậm hơn nhiều so với chạy đơn luồng. Ép OMP_THREAD_LIMIT/OMP_NUM_THREADS
+# về 1 loại bỏ chi phí chuyển ngữ cảnh này.
 
 EXPOSE 8000
 
