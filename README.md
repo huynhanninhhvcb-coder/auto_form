@@ -30,10 +30,12 @@ python app.py
 
 ## Cấu hình OCR trên máy chủ cấu hình thấp
 
-`render.yaml` bật sẵn chế độ OCR nhẹ cho Render Free: một tác vụ Tesseract tại
-một thời điểm, ảnh tối đa 1200 px, chỉ nạp mô hình tiếng Việt và bỏ lượt OCR
-không phù hợp với mặt thẻ CCCD đang đọc. Có thể kiểm tra cấu hình thực tế tại
-`/health`, trong thuộc tính `ocr`.
+Docker image và `render.yaml` đều bật sẵn chế độ OCR nhẹ cho Render Free: một
+tác vụ Tesseract tại một thời điểm, ảnh tối đa 1200 px, chỉ nạp mô hình tiếng
+Việt và bỏ lượt OCR không phù hợp với mặt thẻ CCCD đang đọc. Cấu hình trong
+Docker giúp cả dịch vụ Render đã tạo thủ công (không đồng bộ Blueprint) vẫn
+nhận được các giá trị này. Có thể kiểm tra cấu hình thực tế tại `/health`, trong
+thuộc tính `ocr`.
 
 Máy chủ nhiều CPU có thể bỏ `OCR_FAST_MODE`, tăng `OCR_TARGET_WIDTH` lên 1600,
 dùng `OCR_LANGUAGE=vie+eng` và tăng `OCR_MAX_WORKERS` để ưu tiên độ chính xác/
