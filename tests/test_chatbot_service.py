@@ -117,6 +117,12 @@ class AnswerQuestionTests(unittest.TestCase):
 
 
 class MauDonFoldersTests(unittest.TestCase):
+    def setUp(self):
+        # Kết quả gọi Drive API được cache theo (api_key, folder_id); xóa cache
+        # trước mỗi test để một lần gọi thành công không làm sai kết quả của
+        # test lỗi mạng chạy sau đó trên cùng cặp khóa.
+        chatbot_service._mau_don_cache.clear()
+
     def test_missing_configuration_returns_friendly_error(self):
         folders, error = chatbot_service.list_mau_don_folders(None, None)
         self.assertEqual(folders, [])
@@ -139,6 +145,17 @@ class MauDonFoldersTests(unittest.TestCase):
             folders, error = chatbot_service.list_mau_don_folders("api-key", "folder-id")
         self.assertEqual(folders, [])
         self.assertIn("boom", error)
+
+    def test_second_call_within_ttl_does_not_hit_the_network_again(self):
+        response = Mock()
+        response.raise_for_status = Mock()
+        response.json.return_value = {"files": [{"id": "abc", "name": "Mẫu đơn A"}]}
+        with patch("services.chatbot_service.requests.get", return_value=response) as get:
+            chatbot_service.list_mau_don_folders("api-key", "folder-id")
+            folders, error = chatbot_service.list_mau_don_folders("api-key", "folder-id")
+        self.assertIsNone(error)
+        self.assertEqual(folders, [{"id": "abc", "name": "Mẫu đơn A"}])
+        get.assert_called_once()
 
 
 if __name__ == "__main__":

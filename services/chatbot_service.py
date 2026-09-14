@@ -16,12 +16,17 @@ from pathlib import Path
 from typing import Iterable
 import difflib
 import re
+import time
 import unicodedata
 
 import requests
 
 
 GOOGLE_DRIVE_API_URL = "https://www.googleapis.com/drive/v3/files"
+# Danh sách thư mục mẫu đơn hiếm khi đổi; cache tránh gọi Google Drive API
+# (mạng ngoài, có thể mất vài giây) ở mỗi lượt tải trang "Mẫu đơn, tờ khai".
+_MAU_DON_CACHE_TTL_SECONDS = 15 * 60
+_mau_don_cache: dict[tuple[str, str], tuple[float, list[dict]]] = {}
 
 # Các trường thông tin mà một thủ tục có thể có. Mỗi trường gồm:
 # (khóa, emoji, nhãn hiển thị, regex nhận diện dòng tiêu đề trong file .txt)
@@ -406,6 +411,10 @@ def list_mau_don_folders(api_key: str | None, folder_id: str | None) -> tuple[li
     """
     if not api_key or not folder_id:
         return [], "Chưa cấu hình kho mẫu đơn Google Drive trên máy chủ này."
+    cache_key = (api_key, folder_id)
+    cached = _mau_don_cache.get(cache_key)
+    if cached and time.monotonic() - cached[0] < _MAU_DON_CACHE_TTL_SECONDS:
+        return cached[1], None
     try:
         params = {
             'q': f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
@@ -414,6 +423,11 @@ def list_mau_don_folders(api_key: str | None, folder_id: str | None) -> tuple[li
         }
         resp = requests.get(GOOGLE_DRIVE_API_URL, params=params, timeout=10)
         resp.raise_for_status()
-        return resp.json().get('files', []), None
+        folders = resp.json().get('files', [])
+        _mau_don_cache[cache_key] = (time.monotonic(), folders)
+        return folders, None
     except requests.RequestException as error:
+        if cached:
+            # Google API tạm thời lỗi: vẫn hiển thị danh sách cũ thay vì trang lỗi.
+            return cached[1], None
         return [], f"Không thể tải danh sách mẫu đơn: {error}"
