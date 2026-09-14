@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from collections import deque
+from functools import lru_cache
 from pathlib import Path
 import re
 import unicodedata
@@ -44,6 +45,12 @@ def _available_languages() -> list[str]:
         ) from error
 
 
+@lru_cache(maxsize=4)
+def _cached_languages(tesseract_cmd: str | None) -> tuple[str, ...]:
+    _configure_tesseract(tesseract_cmd)
+    return tuple(_available_languages())
+
+
 def detect_languages(tesseract_cmd: str | None = None) -> list[str]:
     """Cấu hình Tesseract và liệt kê gói ngôn ngữ đã cài, một lần duy nhất.
 
@@ -52,11 +59,10 @@ def detect_languages(tesseract_cmd: str | None = None) -> list[str]:
     nên gọi hàm này một lần rồi truyền kết quả cho mỗi lần OCR, thay vì để
     từng trang tự tra lại.
     """
-    _configure_tesseract(tesseract_cmd)
-    return _available_languages()
+    return list(_cached_languages(tesseract_cmd))
 
 
-def _prepare_image(image: Image.Image) -> Image.Image:
+def _prepare_image(image: Image.Image, target_width: int = 1600) -> Image.Image:
     image = ImageOps.exif_transpose(image)
     image = ImageOps.grayscale(image)
     image = ImageOps.autocontrast(image)
@@ -64,13 +70,14 @@ def _prepare_image(image: Image.Image) -> Image.Image:
     # nhân đôi ảnh nhỏ hoặc giữ nguyên ảnh chụp điện thoại độ phân giải cao
     # (3000-4000px): OCR ảnh lớn không cần thiết là phần tốn CPU nhất trên
     # máy chủ cấu hình thấp (vd. Render free 0.1 CPU).
-    target_width = 1600
-    if image.width > 0 and image.width != target_width:
-        scale = min(1.4, target_width / image.width)
-        if scale < 0.995 or scale > 1.005:
-            image = image.resize(
-                (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
-            )
+    # Không phóng to ảnh nhỏ: nội suy không tạo thêm chi tiết chữ nhưng làm
+    # Tesseract phải xử lý nhiều điểm ảnh hơn. Chỉ thu nhỏ ảnh chụp quá lớn.
+    if image.width > target_width > 0:
+        scale = target_width / image.width
+        image = image.resize(
+            (target_width, max(1, round(image.height * scale))),
+            Image.Resampling.LANCZOS,
+        )
     return image
 
 
@@ -245,7 +252,12 @@ def _split_stacked_cccd(image: Image.Image) -> tuple[Image.Image, Image.Image] |
     return top, bottom
 
 
-def _ocr_cccd_mrz(image: Image.Image, languages: list[str], fallback_language: str) -> str:
+def _ocr_cccd_mrz(
+    image: Image.Image,
+    languages: list[str],
+    fallback_language: str,
+    max_width: int = 2200,
+) -> str:
     """Đọc riêng ba dòng MRZ ở nửa dưới CCCD bằng bộ ký tự hạn chế.
 
     Cách cắt theo tỷ lệ giữ ứng dụng không phụ thuộc OpenCV và hoạt động với
@@ -260,9 +272,12 @@ def _ocr_cccd_mrz(image: Image.Image, languages: list[str], fallback_language: s
 
     crop = ImageOps.autocontrast(ImageOps.grayscale(image.crop((left, top, right, bottom))))
     if crop.width:
-        scale = min(2.0, 2200 / crop.width)
-        if scale > 1:
-            crop = crop.resize((round(crop.width * scale), round(crop.height * scale)), Image.Resampling.LANCZOS)
+        scale = min(2.0, max_width / crop.width)
+        if abs(scale - 1.0) > 0.01:
+            crop = crop.resize(
+                (max(1, round(crop.width * scale)), max(1, round(crop.height * scale))),
+                Image.Resampling.LANCZOS,
+            )
 
     language = "eng" if "eng" in languages else fallback_language
     try:
@@ -286,6 +301,9 @@ def ocr_pil_image(
     tesseract_cmd: str | None = None,
     languages: list[str] | None = None,
     max_workers: int = 5,
+    target_width: int = 1600,
+    preferred_language: str | None = None,
+    fast_mode: bool = False,
 ) -> OCRResult:
     """OCR một ảnh đã mở.
 
@@ -300,12 +318,16 @@ def ocr_pil_image(
         raise OCRUnavailableError("Tesseract không có gói ngôn ngữ nào để nhận dạng văn bản.")
 
     warnings: list[str] = []
-    language = "vie+eng" if "vie" in languages and "eng" in languages else "vie" if "vie" in languages else "eng"
+    requested_languages = [part.strip() for part in (preferred_language or "").split("+") if part.strip()]
+    if requested_languages and all(part in languages for part in requested_languages):
+        language = "+".join(requested_languages)
+    else:
+        language = "vie+eng" if "vie" in languages and "eng" in languages else "vie" if "vie" in languages else "eng"
     if "vie" not in languages:
         warnings.append("Máy chủ chưa cài dữ liệu tiếng Việt cho Tesseract; kết quả OCR có thể sai dấu.")
     try:
         image = _detect_document_crop(image)
-        prepared = _prepare_image(image)
+        prepared = _prepare_image(image, target_width=target_width)
         text = pytesseract.image_to_string(prepared, lang=language, config="--oem 3 --psm 6")
     except TesseractNotFoundError as error:
         raise OCRUnavailableError("Không thể khởi chạy Tesseract OCR.") from error
@@ -316,6 +338,22 @@ def ocr_pil_image(
     page_texts = [primary_text] if primary_text else []
     mrz_texts: list[str] = []
     if _looks_like_cccd(text, prepared):
+        # Một ảnh đơn thường chỉ là mặt trước HOẶC mặt sau. Ở chế độ nhanh,
+        # mặt trước chỉ cần OCR bố cục, mặt sau chỉ cần OCR MRZ; trước đây cả
+        # hai lượt đều chạy cho mọi mặt thẻ dù một lượt chắc chắn vô ích.
+        folded_text = _fold_for_detection(text)
+        has_mrz_marker = bool(re.search(r"\b[1il]dvnm", folded_text))
+        stacked_halves = _split_stacked_cccd(image)
+        run_layout = not fast_mode or not has_mrz_marker or stacked_halves is not None
+        run_mrz = not fast_mode or has_mrz_marker or stacked_halves is not None
+
+        layout_image = prepared
+        if stacked_halves is not None:
+            front_region, back_region = stacked_halves
+            layout_image = _prepare_image(front_region, target_width=target_width)
+        else:
+            back_region = image
+
         def _layout_call() -> str:
             # PSM 11 nhận các khối chữ rời của mặt trước tốt hơn PSM 6, trong
             # khi PSM 6 vẫn hữu ích cho bố cục thông thường. Giữ cả hai để
@@ -323,7 +361,7 @@ def ocr_pil_image(
             try:
                 layout_language = "vie" if "vie" in languages else language
                 return pytesseract.image_to_string(
-                    prepared, lang=layout_language, config="--oem 3 --psm 11"
+                    layout_image, lang=layout_language, config="--oem 3 --psm 11"
                 ).strip()
             except pytesseract.TesseractError:
                 return ""
@@ -332,11 +370,6 @@ def ocr_pil_image(
         # ảnh của cả composite, không phải của một mặt thẻ nằm ngang. Tách đôi
         # trước khi đọc MRZ, nếu không toạ độ tương đối của vùng MRZ (52%-97%
         # chiều cao ảnh) sẽ trật khỏi mặt sau.
-        back_region = image
-        stacked_halves = _split_stacked_cccd(image)
-        if stacked_halves is not None:
-            _, back_region = stacked_halves
-
         # CPU máy chủ triển khai (vd. Render free 0.1 CPU) quá yếu để chạy nổi
         # các lượt OCR vùng chuyên biệt (tên/ngày sinh/giới tính/địa chỉ) từng
         # có ở đây: mỗi lượt là một tiến trình Tesseract riêng, tốn vài giây
@@ -344,17 +377,30 @@ def ocr_pil_image(
         # như vậy. Giờ chỉ giữ lượt đọc bố cục (bổ sung cho lượt đọc chính ở
         # trên) và MRZ. Đổi lại, một số CCCD chụp lóa sáng/mờ/kiểu cũ có thể
         # thiếu tên, ngày sinh hoặc địa chỉ và cần người dùng tự nhập bù.
-        with ThreadPoolExecutor(max_workers=max(1, max_workers)) as executor:
-            layout_future = executor.submit(_layout_call)
-            mrz_future = executor.submit(_ocr_cccd_mrz, back_region, languages, language)
+        task_count = int(run_layout) + int(run_mrz)
+        with ThreadPoolExecutor(max_workers=max(1, min(max_workers, task_count))) as executor:
+            layout_future = executor.submit(_layout_call) if run_layout else None
+            mrz_future = (
+                executor.submit(
+                    _ocr_cccd_mrz,
+                    back_region,
+                    languages,
+                    language,
+                    1400 if fast_mode else 2200,
+                )
+                if run_mrz
+                else None
+            )
 
-            layout_text = layout_future.result()
-            if layout_text and layout_text not in primary_text:
-                page_texts.append(f"--- CCCD BỐ CỤC ---\n{layout_text}")
+            if layout_future is not None:
+                layout_text = layout_future.result()
+                if layout_text and layout_text not in primary_text:
+                    page_texts.append(f"--- CCCD BỐ CỤC ---\n{layout_text}")
 
-            mrz_text = mrz_future.result()
-            if mrz_text:
-                mrz_texts.append(mrz_text)
+            if mrz_future is not None:
+                mrz_text = mrz_future.result()
+                if mrz_text:
+                    mrz_texts.append(mrz_text)
 
     cleaned_text = "\n\n".join(page_texts).strip()
     return OCRResult(
@@ -370,9 +416,22 @@ def ocr_image(
     tesseract_cmd: str | None = None,
     languages: list[str] | None = None,
     max_workers: int = 5,
+    target_width: int = 1600,
+    preferred_language: str | None = None,
+    fast_mode: bool = False,
 ) -> OCRResult:
     try:
+        if languages is None:
+            languages = detect_languages(tesseract_cmd)
         with Image.open(image_path) as image:
-            return ocr_pil_image(image, tesseract_cmd=tesseract_cmd, languages=languages, max_workers=max_workers)
+            return ocr_pil_image(
+                image,
+                tesseract_cmd=tesseract_cmd,
+                languages=languages,
+                max_workers=max_workers,
+                target_width=target_width,
+                preferred_language=preferred_language,
+                fast_mode=fast_mode,
+            )
     except (OSError, ValueError) as error:
         raise ValueError("Tệp ảnh không hợp lệ hoặc bị hỏng.") from error

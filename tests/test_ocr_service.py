@@ -10,15 +10,88 @@ from PIL import Image
 from services.ocr_service import (
     _detect_document_crop,
     _looks_like_cccd,
+    _prepare_image,
     _split_stacked_cccd,
     ocr_pil_image,
 )
 
 
 class CccdDetectionTests(unittest.TestCase):
+    def test_preparation_never_upscales_a_small_image(self):
+        image = Image.new("RGB", (800, 500), "white")
+
+        prepared = _prepare_image(image, target_width=1200)
+
+        self.assertEqual(prepared.size, image.size)
+
+    def test_preparation_downscales_a_large_image_to_configured_width(self):
+        image = Image.new("RGB", (2400, 1500), "white")
+
+        prepared = _prepare_image(image, target_width=1200)
+
+        self.assertEqual(prepared.size, (1200, 750))
+
+    def test_uses_configured_single_language_for_primary_ocr(self):
+        image = Image.new("RGB", (800, 500), "white")
+        with patch(
+            "services.ocr_service.pytesseract.image_to_string", return_value=""
+        ) as image_to_string:
+            ocr_pil_image(
+                image,
+                languages=["vie", "eng"],
+                preferred_language="vie",
+            )
+
+        self.assertEqual(image_to_string.call_args.kwargs["lang"], "vie")
+
     def test_does_not_treat_every_horizontal_official_document_as_cccd(self):
         image = Image.new("RGB", (1200, 800), "white")
         self.assertFalse(_looks_like_cccd("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", image))
+
+    def test_fast_mode_skips_mrz_pass_for_a_front_only_card(self):
+        image = Image.new("RGB", (1600, 1000), "white")
+        front_text = "CĂN CƯỚC CÔNG DÂN\nSố: 000000000000\nHọ và tên: NGUYỄN VĂN THỬ"
+
+        with (
+            patch(
+                "services.ocr_service.pytesseract.image_to_string",
+                return_value=front_text,
+            ) as image_to_string,
+            patch("services.ocr_service._ocr_cccd_mrz", return_value="") as mrz,
+        ):
+            ocr_pil_image(
+                image,
+                languages=["vie", "eng"],
+                max_workers=1,
+                fast_mode=True,
+            )
+
+        self.assertEqual(image_to_string.call_count, 2)  # toàn thẻ + bố cục
+        mrz.assert_not_called()
+
+    def test_fast_mode_skips_layout_pass_for_a_back_only_card(self):
+        image = Image.new("RGB", (1600, 1000), "white")
+        back_text = "IDVNM000000000000<<<<<<<<<<<<"
+
+        with (
+            patch(
+                "services.ocr_service.pytesseract.image_to_string",
+                return_value=back_text,
+            ) as image_to_string,
+            patch(
+                "services.ocr_service._ocr_cccd_mrz",
+                return_value=back_text,
+            ) as mrz,
+        ):
+            ocr_pil_image(
+                image,
+                languages=["vie", "eng"],
+                max_workers=1,
+                fast_mode=True,
+            )
+
+        self.assertEqual(image_to_string.call_count, 1)  # chỉ lượt toàn thẻ
+        mrz.assert_called_once()
 
     def test_crops_warm_card_from_large_neutral_phone_photo(self):
         image = Image.new("RGB", (900, 1600), (130, 145, 125))

@@ -28,6 +28,18 @@ $env:TESSERACT_CMD = 'C:\Program Files\Tesseract-OCR\tesseract.exe'
 python app.py
 ```
 
+## Cấu hình OCR trên máy chủ cấu hình thấp
+
+`render.yaml` bật sẵn chế độ OCR nhẹ cho Render Free: một tác vụ Tesseract tại
+một thời điểm, ảnh tối đa 1200 px, chỉ nạp mô hình tiếng Việt và bỏ lượt OCR
+không phù hợp với mặt thẻ CCCD đang đọc. Có thể kiểm tra cấu hình thực tế tại
+`/health`, trong thuộc tính `ocr`.
+
+Máy chủ nhiều CPU có thể bỏ `OCR_FAST_MODE`, tăng `OCR_TARGET_WIDTH` lên 1600,
+dùng `OCR_LANGUAGE=vie+eng` và tăng `OCR_MAX_WORKERS` để ưu tiên độ chính xác/
+thông lượng. Không nên tăng worker trên Render Free vì các tiến trình Tesseract
+sẽ tranh cùng 0.1 CPU và có thể làm yêu cầu OCR lỗi 502.
+
 ## Quét nhiều tệp cùng lúc
 
 Ở tab **Tải ảnh hoặc PDF**, có thể chọn hoặc kéo-thả tối đa **5** ảnh/PDF trong một lượt (tối đa **12 MB mỗi tệp**, **60 MB tổng cộng**). Có thể bổ sung tệp qua nhiều lần chọn, bỏ từng tệp hoặc xóa toàn bộ danh sách trước khi quét.
@@ -71,7 +83,7 @@ Các trường hiện dùng: `full_name`, `date_of_birth`, `gender`, `ethnic_gro
 
 ## Trợ lý phỏng vấn
 
-Chọn tab **Trợ lý phỏng vấn** ở bước 1 khi không có PDF/ảnh. Micro nhận câu trả lời với ngôn ngữ `vi-VN`; người dân bấm micro để trả lời và câu trả lời được tự gửi vào biểu mẫu. CCCD, ngày sinh, điện thoại và số tài khoản sẽ hiện transcript để xác nhận trước khi điền. CCCD/điện thoại có thể đọc từng chữ số, ví dụ “không, bảy, chín…”.
+Chọn tab **Trợ lý phỏng vấn** ở bước 1 khi không có PDF/ảnh. Micro nhận câu trả lời với ngôn ngữ `vi-VN`; mọi bản chép lời đều phải được người dân xác nhận hoặc chọn nói lại trước khi câu trả lời được gửi vào biểu mẫu. CCCD/điện thoại có thể đọc từng chữ số, ví dụ “không, bảy, chín…”.
 
 Bộ câu hỏi thay đổi theo biểu mẫu đang chọn ở Bước 1 (`services/interview_service.py`, `TEMPLATE_STEPS`): mẫu trợ cấp hưu trí hỏi về bản thân người đề nghị; hai mẫu hỏa táng/mai táng hỏi thêm về người đã mất (họ tên, ngày mất là bắt buộc; ngày sinh, giới tính, dân tộc, nơi cư trú, CCCD, nơi/nguyên nhân mất, giấy chứng tử là tùy chọn) và tổ chức đứng ra lo hậu sự nếu có. Thêm biểu mẫu mới thì cũng cần thêm một bộ câu hỏi tương ứng vào `TEMPLATE_STEPS`, nếu không trợ lý sẽ dùng lại bộ câu hỏi của mẫu trợ cấp hưu trí.
 

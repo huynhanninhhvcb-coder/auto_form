@@ -15,6 +15,12 @@ services:
         value: "false"
       - key: OCR_MAX_WORKERS
         value: "1"
+      - key: OCR_TARGET_WIDTH
+        value: "1200"
+      - key: OCR_LANGUAGE
+        value: vie
+      - key: OCR_FAST_MODE
+        value: "true"
       - key: GOOGLE_DRIVE_API_KEY
         sync: false
       - key: MAU_DON_FOLDER_ID

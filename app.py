@@ -178,12 +178,18 @@ def _process_saved_upload(app: Flask, name: str, filepath: Path, extension: str,
                 max_pages=app.config["MAX_PDF_PAGES"],
                 tesseract_cmd=app.config.get("TESSERACT_CMD"),
                 max_workers=app.config["OCR_MAX_WORKERS"],
+                target_width=app.config["OCR_TARGET_WIDTH"],
+                preferred_language=app.config.get("OCR_LANGUAGE"),
+                fast_mode=app.config["OCR_FAST_MODE"],
             )
         else:
             processed = ocr_image(
                 filepath,
                 tesseract_cmd=app.config.get("TESSERACT_CMD"),
                 max_workers=app.config["OCR_MAX_WORKERS"],
+                target_width=app.config["OCR_TARGET_WIDTH"],
+                preferred_language=app.config.get("OCR_LANGUAGE"),
+                fast_mode=app.config["OCR_FAST_MODE"],
             )
         extracted = extract_personal_information(
             processed.text,
@@ -369,6 +375,12 @@ def create_app(test_config: dict | None = None) -> Flask:
             tesseract_configured=bool(app.config.get("TESSERACT_CMD")),
             ai_configured=is_configured(app.config),
             ai_model=app.config.get("OPENAI_MODEL") if is_configured(app.config) else None,
+            ocr={
+                "max_workers": app.config["OCR_MAX_WORKERS"],
+                "target_width": app.config["OCR_TARGET_WIDTH"],
+                "language": app.config.get("OCR_LANGUAGE") or "automatic",
+                "fast_mode": app.config["OCR_FAST_MODE"],
+            },
         )
 
     @app.post("/api/chatbot/chat")
@@ -467,12 +479,18 @@ def create_app(test_config: dict | None = None) -> Flask:
                     max_pages=app.config["MAX_PDF_PAGES"],
                     tesseract_cmd=app.config.get("TESSERACT_CMD"),
                     max_workers=app.config["OCR_MAX_WORKERS"],
+                    target_width=app.config["OCR_TARGET_WIDTH"],
+                    preferred_language=app.config.get("OCR_LANGUAGE"),
+                    fast_mode=app.config["OCR_FAST_MODE"],
                 )
             else:
                 processed = ocr_image(
                     filepath,
                     tesseract_cmd=app.config.get("TESSERACT_CMD"),
                     max_workers=app.config["OCR_MAX_WORKERS"],
+                    target_width=app.config["OCR_TARGET_WIDTH"],
+                    preferred_language=app.config.get("OCR_LANGUAGE"),
+                    fast_mode=app.config["OCR_FAST_MODE"],
                 )
             extracted = extract_personal_information(
                 processed.text,

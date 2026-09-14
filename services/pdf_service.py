@@ -40,6 +40,9 @@ def ocr_pdf(
     max_pages: int,
     tesseract_cmd: str | None = None,
     max_workers: int = 5,
+    target_width: int = 1600,
+    preferred_language: str | None = None,
+    fast_mode: bool = False,
 ) -> OCRResult:
     try:
         # Tra cứu gói ngôn ngữ một lần cho cả tệp: mỗi lần gọi tốn 150 ms-1 s
@@ -54,7 +57,14 @@ def ocr_pdf(
                 page = document.load_page(index)
                 pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
                 image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
-                result = ocr_pil_image(image, languages=languages, max_workers=max_workers)
+                result = ocr_pil_image(
+                    image,
+                    languages=languages,
+                    max_workers=max_workers,
+                    target_width=target_width,
+                    preferred_language=preferred_language,
+                    fast_mode=fast_mode,
+                )
                 # Một trang CCCD có thể có thêm vùng OCR bố cục/MRZ để parser
                 # ưu tiên thông tin rõ hơn; vẫn chỉ lặp tối đa số trang PDF cho phép.
                 pages.extend(result.pages or [result.text])
@@ -78,6 +88,9 @@ def process_pdf(
     max_pages: int,
     tesseract_cmd: str | None = None,
     max_workers: int = 5,
+    target_width: int = 1600,
+    preferred_language: str | None = None,
+    fast_mode: bool = False,
 ) -> OCRResult:
     pages = extract_pdf_pages(file_path, max_pages=max_pages)
     text = _combine_pages(pages)
@@ -88,4 +101,12 @@ def process_pdf(
         except fitz.FileDataError:
             warnings = []
         return OCRResult(text=text, warnings=warnings, source="pdf_text", pages=pages)
-    return ocr_pdf(file_path, max_pages=max_pages, tesseract_cmd=tesseract_cmd, max_workers=max_workers)
+    return ocr_pdf(
+        file_path,
+        max_pages=max_pages,
+        tesseract_cmd=tesseract_cmd,
+        max_workers=max_workers,
+        target_width=target_width,
+        preferred_language=preferred_language,
+        fast_mode=fast_mode,
+    )

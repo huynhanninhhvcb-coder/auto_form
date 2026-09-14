@@ -17,6 +17,15 @@ if load_dotenv:
     load_dotenv(BASE_DIR / ".env")
 
 
+def _bounded_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    """Đọc số nguyên môi trường an toàn, không làm ứng dụng lỗi khi cấu hình sai."""
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
 def _find_tesseract() -> str | None:
     """Ưu tiên cấu hình triển khai, sau đó nhận diện vị trí cài chuẩn trên Windows."""
     configured = os.environ.get("TESSERACT_CMD")
@@ -53,7 +62,18 @@ class Config:
     # gói free của Render, ~0.1 CPU), chạy nhiều tiến trình song song khiến mỗi
     # tiến trình chậm đi rất nhiều thay vì nhanh hơn. Đặt OCR_MAX_WORKERS=1 ở
     # môi trường đó để buộc chạy tuần tự.
-    OCR_MAX_WORKERS = max(1, int(os.environ.get("OCR_MAX_WORKERS", "5")))
+    OCR_MAX_WORKERS = _bounded_env_int("OCR_MAX_WORKERS", 5, 1, 8)
+    # Render Free chỉ có một phần rất nhỏ CPU. Hạ chiều rộng ảnh và chỉ dùng
+    # một mô hình ngôn ngữ giúp giảm đáng kể số điểm ảnh/LSTM phải xử lý mà
+    # không thay đổi cấu hình chất lượng cao khi chạy nội bộ.
+    OCR_TARGET_WIDTH = _bounded_env_int("OCR_TARGET_WIDTH", 1600, 900, 2200)
+    OCR_LANGUAGE = os.environ.get("OCR_LANGUAGE", "").strip() or None
+    OCR_FAST_MODE = os.environ.get("OCR_FAST_MODE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     INTERVIEW_TTL_SECONDS = 30 * 60
     # Có thể ghi đè qua TESSERACT_CMD, ví dụ một bản cài portable.
     TESSERACT_CMD = _find_tesseract()

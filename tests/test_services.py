@@ -214,6 +214,16 @@ class DocumentAndRouteTests(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    def test_health_reports_active_ocr_performance_configuration(self):
+        response = self.app.test_client().get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["ocr"]["max_workers"], self.app.config["OCR_MAX_WORKERS"])
+        self.assertEqual(payload["ocr"]["target_width"], self.app.config["OCR_TARGET_WIDTH"])
+        self.assertEqual(payload["ocr"]["fast_mode"], self.app.config["OCR_FAST_MODE"])
+
     def test_document_contains_mapped_values(self):
         output = Path(self.temp_dir.name) / "filled.docx"
         generate_document(
