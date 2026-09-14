@@ -145,6 +145,22 @@ Dạng khuyết tật: Thần kinh, tâm thần"""
         self.assertIn("Trần Quý", result.fields["residence_address"])
         self.assertEqual(result.fields["citizen_id"], "")
 
+    def test_residence_uses_permanent_address_and_contact_uses_current_address(self):
+        """"Nơi cư trú" trên đơn phải lấy địa chỉ thường trú, "Địa chỉ liên lạc"
+        phải lấy nơi ở hiện tại — hai địa chỉ khác nhau trên cùng giấy tờ
+        không được lẫn vào nhau (vd. phiếu thông tin dân cư)."""
+        result = extract_personal_information(
+            """Họ và tên: NGUYỄN LÊ HOÀNG YẾN
+Số định danh: 079183035515
+Ngày sinh: 09/05/1983
+Nơi ở hiện tại: 172/26 Tạ Uyên, Khu phố 14, Phường Minh Phụng, Thành phố Hồ Chí Minh
+Địa chỉ thường trú: 45 Nguyễn Trãi, Phường Bến Thành, Thành phố Hồ Chí Minh"""
+        )
+        self.assertIn("Nguyễn Trãi", result.fields["residence_address"])
+        self.assertNotIn("Tạ Uyên", result.fields["residence_address"])
+        self.assertIn("Tạ Uyên", result.fields["contact_address"])
+        self.assertNotIn("Nguyễn Trãi", result.fields["contact_address"])
+
     def test_accepts_common_ocr_misspelling_of_gender_label(self):
         result = extract_personal_information(
             "Gidi tinh: Nam\nSố định danh cá nhân: 079044004914"

@@ -698,8 +698,11 @@ def extract_personal_information(
         field_candidates["citizen_id"].extend(_citizen_id_candidates(page, base_score))
         field_candidates["gender"].extend(_gender_candidates(page, base_score))
         field_candidates["ethnic_group"].extend(_ethnic_candidates(page, base_score))
-        residence_candidates.extend(_address_candidates(page, base_score, r"noi\s+o\s+hien\s+tai", 45))
-        residence_candidates.extend(_address_candidates(page, base_score, r"noi\s+o\s+hien\s+nay", 45))
+        # "Nơi ở hiện tại/hiện nay" là chỗ đang sinh sống, gần nghĩa "Địa chỉ
+        # liên lạc" trên đơn hơn là "Nơi cư trú" (nơi thường trú/hộ khẩu chính
+        # thức) — đưa hai nhãn này vào contact_candidates thay vì residence.
+        contact_candidates.extend(_address_candidates(page, base_score, r"noi\s+o\s+hien\s+tai", 45))
+        contact_candidates.extend(_address_candidates(page, base_score, r"noi\s+o\s+hien\s+nay", 45))
         residence_candidates.extend(_address_candidates(page, base_score, r"dia\s+chi\s+thuong\s+tru", 40))
         residence_candidates.extend(_address_candidates(page, base_score, r"noi\s+thuong\s+tru", 55))
         residence_candidates.extend(_address_candidates(page, base_score, r"place\s+of\s+residence", 45))
@@ -751,14 +754,22 @@ def extract_personal_information(
     contact_winner = _best_candidate(contact_candidates)
     fields["residence_address"], confidence["residence_address"] = _pick(residence_candidates)
     fields["contact_address"], confidence["contact_address"] = _pick(contact_candidates)
-    # Phiếu dân cư thường chỉ có nơi ở hiện tại/thường trú; dùng địa chỉ này để
-    # liên lạc khi không có trường liên lạc riêng thay vì điền ô trống từ mẫu khác.
+    # Một số giấy tờ chỉ có duy nhất địa chỉ cư trú (vd. CCCD chỉ ghi "Nơi
+    # thường trú", không có "Nơi ở hiện tại"/"Địa chỉ liên lạc"); khi đó dùng
+    # luôn địa chỉ cư trú cho ô liên lạc thay vì để trống.
     if (
         not fields["contact_address"]
         or (residence_winner and contact_winner and contact_winner.score < residence_winner.score)
     ) and fields["residence_address"]:
         fields["contact_address"] = fields["residence_address"]
         confidence["contact_address"] = confidence["residence_address"]
+    # Ngược lại, một số giấy tờ (giấy xác nhận khuyết tật, phiếu dân cư cũ...)
+    # chỉ ghi "Nơi ở hiện tại" chứ không có địa chỉ thường trú riêng; dùng luôn
+    # địa chỉ đó cho ô cư trú thay vì để trống. Chỉ áp dụng khi ô cư trú còn
+    # trống hẳn (không ghi đè một địa chỉ thường trú đã nhận diện được).
+    if not fields["residence_address"] and fields["contact_address"]:
+        fields["residence_address"] = fields["contact_address"]
+        confidence["residence_address"] = confidence["contact_address"]
 
     warnings = ["Dữ liệu được suy luận từ OCR/PDF. Hãy kiểm tra kỹ mọi trường trước khi tải đơn."]
     if (
