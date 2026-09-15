@@ -8,11 +8,30 @@ import re
 import pymupdf as fitz
 from PIL import Image
 
+from services.extraction_service import extract_personal_information
 from services.ocr_service import OCRResult, detect_languages, ocr_pil_image
 
 
 class PDFProcessingError(RuntimeError):
     pass
+
+
+# Mọi mẫu đơn đều cần đủ 3 trường này cộng ít nhất một địa chỉ của người đề
+# nghị. Một khi đã có đủ, các trang sau (khai tử, sổ ngân hàng...) không còn
+# cản việc dừng OCR sớm ở đây; người dùng vẫn được cảnh báo để tải riêng
+# giấy tờ đó thành tệp khác nếu hồ sơ thực sự còn.
+_CORE_IDENTITY_FIELDS = ("full_name", "date_of_birth", "citizen_id")
+_CORE_ADDRESS_FIELDS = ("residence_address", "contact_address")
+# Luôn OCR tối thiểu 2 trang trước khi xét dừng sớm: mặt trước/sau CCCD
+# thường nằm ở hai trang liên tiếp và một trang đơn lẻ hiếm khi đủ trường.
+_MIN_PAGES_BEFORE_EARLY_STOP = 2
+
+
+def _has_core_identity_fields(text: str, pages: list[str], mrz_texts: list[str]) -> bool:
+    fields = extract_personal_information(text, page_texts=pages, cccd_mrz_texts=mrz_texts).fields
+    if any(not fields.get(name) for name in _CORE_IDENTITY_FIELDS):
+        return False
+    return any(fields.get(name) for name in _CORE_ADDRESS_FIELDS)
 
 
 def _combine_pages(pages: list[str]) -> str:
@@ -53,7 +72,9 @@ def ocr_pdf(
         warnings: list[str] = []
         mrz_texts: list[str] = []
         with fitz.open(file_path) as document:
-            for index in range(min(document.page_count, max_pages)):
+            page_limit = min(document.page_count, max_pages)
+            stopped_early_at: int | None = None
+            for index in range(page_limit):
                 page = document.load_page(index)
                 pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
                 image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
@@ -70,7 +91,27 @@ def ocr_pdf(
                 pages.extend(result.pages or [result.text])
                 warnings.extend(result.warnings)
                 mrz_texts.extend(result.mrz_texts)
-            if document.page_count > max_pages:
+
+                scanned = index + 1
+                if (
+                    page_limit - scanned > 0
+                    and scanned >= _MIN_PAGES_BEFORE_EARLY_STOP
+                    and _has_core_identity_fields(_combine_pages(pages), pages, mrz_texts)
+                ):
+                    # Hồ sơ nộp thường là một CCCD/phiếu dân cư quét thành PDF
+                    # nhiều trang; một khi đã đọc đủ thông tin cốt lõi của
+                    # người đề nghị, các trang còn lại (thường là mặt sau lặp
+                    # lại, trang trắng...) không còn xứng đáng với thời gian
+                    # OCR trên CPU hạn chế của môi trường triển khai.
+                    stopped_early_at = scanned
+                    break
+            if stopped_early_at is not None:
+                warnings.append(
+                    f"Đã đủ thông tin cơ bản sau {stopped_early_at}/{page_limit} trang đầu nên bỏ qua các trang "
+                    "còn lại để xử lý nhanh hơn. Nếu hồ sơ còn giấy tờ khác (khai tử, sổ ngân hàng...) ở trang "
+                    "sau, hãy tải trang đó thành tệp riêng."
+                )
+            elif document.page_count > max_pages:
                 warnings.append(f"Chỉ OCR {max_pages}/{document.page_count} trang đầu của PDF.")
         return OCRResult(
             text=_combine_pages(pages),
