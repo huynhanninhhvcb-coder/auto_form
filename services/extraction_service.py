@@ -29,9 +29,16 @@ FIELD_NAMES = {
     "gender": "Giới tính",
     "ethnic_group": "Dân tộc",
     "citizen_id": "Số CCCD/định danh",
+    "citizen_id_issue_date": "Ngày cấp CCCD",
+    "citizen_id_issue_place": "Nơi cấp CCCD",
     "residence_address": "Nơi cư trú",
     "contact_address": "Địa chỉ liên lạc",
+    "temporary_address": "Nơi tạm trú",
     "phone_number": "Số điện thoại",
+    "occupation": "Nghề nghiệp",
+    "employer": "Đơn vị công tác",
+    "support_category": "Đối tượng nhận hỗ trợ",
+    "support_detail": "Mã số/thông tin đối tượng hỗ trợ",
     "benefit_receiving_location": "Nơi nhận trợ cấp",
     "bank_account_name": "Tên chủ tài khoản",
     "bank_account_number": "Số tài khoản",
@@ -639,6 +646,38 @@ def _phone_candidates(page: str, base_score: int) -> list[Candidate]:
     return candidates
 
 
+def _single_line_labeled_candidates(
+    page: str,
+    base_score: int,
+    label_pattern: str,
+    *,
+    maximum_length: int = 160,
+) -> list[Candidate]:
+    """Đọc một giá trị trên cùng dòng sau nhãn, dùng cho trường mẫu NQ32/NQ40."""
+    candidates: list[Candidate] = []
+    for (value,) in _matched_groups(page, rf"{label_pattern}\s*:\s*([^\n]{{1,{maximum_length}}})"):
+        value = re.split(r"\.{3,}", value, maxsplit=1)[0]
+        _add(
+            candidates,
+            normalize_text(value),
+            base_score + 35,
+            lambda item: 1 <= len(item) <= maximum_length,
+        )
+    return candidates
+
+
+def _citizen_issue_date_candidates(page: str, base_score: int) -> list[Candidate]:
+    candidates: list[Candidate] = []
+    patterns = (
+        r"ngay\s*cap\s*:\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})",
+        r"ngay\s*,?\s*thang\s*,?\s*nam(?:\s*/[^\n:]{0,45})?\s*:\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})",
+    )
+    for pattern in patterns:
+        for (value,) in _matched_groups(page, pattern):
+            _add(candidates, normalize_date(value), base_score + 40)
+    return candidates
+
+
 def _split_pages(raw_text: str, page_texts: list[str] | None) -> list[str]:
     if page_texts:
         return [normalize_text(page) for page in page_texts if normalize_text(page)]
@@ -696,6 +735,10 @@ def extract_personal_information(
         field_candidates["full_name"].extend(_name_candidates(page, base_score))
         field_candidates["date_of_birth"].extend(_date_candidates(page, base_score))
         field_candidates["citizen_id"].extend(_citizen_id_candidates(page, base_score))
+        field_candidates["citizen_id_issue_date"].extend(_citizen_issue_date_candidates(page, base_score))
+        field_candidates["citizen_id_issue_place"].extend(
+            _single_line_labeled_candidates(page, base_score, r"noi\s*cap")
+        )
         field_candidates["gender"].extend(_gender_candidates(page, base_score))
         field_candidates["ethnic_group"].extend(_ethnic_candidates(page, base_score))
         # "Nơi ở hiện tại/hiện nay" là chỗ đang sinh sống, gần nghĩa "Địa chỉ
@@ -708,7 +751,16 @@ def extract_personal_information(
         residence_candidates.extend(_address_candidates(page, base_score, r"place\s+of\s+residence", 45))
         residence_candidates.extend(_address_candidates(page, base_score, r"no[i1]?\s+cu\s+tru", 25))
         contact_candidates.extend(_address_candidates(page, base_score, r"dia\s+chi\s+lien\s+lac", 25))
+        field_candidates["temporary_address"].extend(
+            _single_line_labeled_candidates(page, base_score, r"noi\s*tam\s*tru(?:\s*\([^\n)]*\))?")
+        )
         field_candidates["phone_number"].extend(_phone_candidates(page, base_score))
+        field_candidates["occupation"].extend(
+            _single_line_labeled_candidates(page, base_score, r"nghe\s*nghiep")
+        )
+        field_candidates["employer"].extend(
+            _single_line_labeled_candidates(page, base_score, r"don\s*vi\s*cong\s*tac")
+        )
         field_candidates["bank_account_name"].extend(_bank_account_name_candidates(page, base_score))
         field_candidates["bank_account_number"].extend(_bank_account_number_candidates(page, base_score))
         field_candidates["bank_name"].extend(_bank_name_candidates(page, base_score))
@@ -729,9 +781,16 @@ def extract_personal_information(
         "full_name",
         "date_of_birth",
         "citizen_id",
+        "citizen_id_issue_date",
+        "citizen_id_issue_place",
         "gender",
         "ethnic_group",
+        "temporary_address",
         "phone_number",
+        "occupation",
+        "employer",
+        "support_category",
+        "support_detail",
         "bank_account_name",
         "bank_account_number",
         "bank_name",

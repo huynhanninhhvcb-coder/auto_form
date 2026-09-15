@@ -1,6 +1,6 @@
 # Auto Form
 
-Ứng dụng Flask hỗ trợ người dân điền biểu mẫu hành chính từ PDF/ảnh giấy tờ hoặc qua Trợ lý phỏng vấn. Hiện hỗ trợ 3 biểu mẫu: **Văn bản đề nghị hưởng trợ cấp hưu trí xã hội**, **Tờ khai nhận chi phí hỗ trợ khuyến khích hỏa táng**, và **Tờ khai đề nghị hỗ trợ chi phí mai táng**.
+Ứng dụng Flask hỗ trợ người dân điền biểu mẫu hành chính từ PDF/ảnh giấy tờ hoặc qua Trợ lý phỏng vấn. Hiện hỗ trợ 5 biểu mẫu: **Văn bản đề nghị hưởng trợ cấp hưu trí xã hội**, **Tờ khai nhận chi phí hỗ trợ khuyến khích hỏa táng**, **Tờ khai đề nghị hỗ trợ chi phí mai táng**, và hai **Tờ khai thông tin cá nhân nhận hỗ trợ theo Nghị quyết 40/NQ-HĐND, Nghị quyết 32/2025/NQ-HĐND**.
 
 Luồng xử lý:
 
@@ -42,6 +42,12 @@ dùng `OCR_LANGUAGE=vie+eng` và tăng `OCR_MAX_WORKERS` để ưu tiên độ c
 thông lượng. Không nên tăng worker trên Render Free vì các tiến trình Tesseract
 sẽ tranh cùng 0.1 CPU và có thể làm yêu cầu OCR lỗi 502.
 
+Khi người dân đánh dấu **Chế độ nhanh: cho phép AI đọc trực tiếp**, ứng dụng gửi
+tài liệu thẳng tới OpenAI vision sau khi có sự đồng ý rõ ràng và bỏ qua
+Tesseract. Tối đa `AI_MAX_WORKERS` tệp được đọc đồng thời. Nếu OpenAI lỗi hoặc
+không nhận ra thông tin, ứng dụng tự quay về OCR cục bộ (tuần tự) và hiển thị
+cảnh báo để người dân biết. Khi không đánh dấu, tài liệu không được gửi tới AI.
+
 ## Quét nhiều tệp cùng lúc
 
 Ở tab **Tải ảnh hoặc PDF**, có thể chọn hoặc kéo-thả tối đa **5** ảnh/PDF trong một lượt (tối đa **12 MB mỗi tệp**, **60 MB tổng cộng**). Có thể bổ sung tệp qua nhiều lần chọn, bỏ từng tệp hoặc xóa toàn bộ danh sách trước khi quét.
@@ -81,13 +87,13 @@ Trên giao diện, người dân phải chủ động đánh dấu **Cho phép A
 3. Nếu mẫu dùng các nhãn có sẵn thay vì placeholder (như mẫu trợ cấp hưu trí, mẫu cũ hơn), thêm mapping riêng trong `services/docx_service.py`.
 4. Nếu mẫu cần trường dữ liệu chưa có, thêm vào `FIELD_NAMES` trong `services/extraction_service.py`, rồi thêm ô nhập tương ứng trong `templates/index.html` — bọc trong khối `class="template-fields" data-template="<id-biểu-mẫu>"` (nhiều id cách nhau bằng dấu cách nếu trường dùng chung cho nhiều biểu mẫu) để ô chỉ hiện khi biểu mẫu đó được chọn (xem `setTemplateFields` trong `static/js/app.js`).
 
-Các trường hiện dùng: `full_name`, `date_of_birth`, `gender`, `ethnic_group`, `citizen_id`, `residence_address`, `contact_address`, `phone_number`, nhóm tài khoản ngân hàng, nhóm người giám hộ (`guardian_*`), và nhóm người đã mất/tổ chức lo mai táng (`deceased_*`, `death_certificate_*`, `org_*`) dùng cho hai mẫu hỏa táng/mai táng.
+Các trường hiện dùng: `full_name`, `date_of_birth`, `gender`, `ethnic_group`, `citizen_id`, `residence_address`, `contact_address`, `phone_number`, nhóm thông tin NQ32/NQ40 (`citizen_id_issue_*`, `temporary_address`, `occupation`, `employer`, `support_*`), nhóm tài khoản ngân hàng, nhóm người giám hộ (`guardian_*`), và nhóm người đã mất/tổ chức lo mai táng (`deceased_*`, `death_certificate_*`, `org_*`) dùng cho hai mẫu hỏa táng/mai táng.
 
 ## Trợ lý phỏng vấn
 
 Chọn tab **Trợ lý phỏng vấn** ở bước 1 khi không có PDF/ảnh. Micro nhận câu trả lời với ngôn ngữ `vi-VN`; mọi bản chép lời đều phải được người dân xác nhận hoặc chọn nói lại trước khi câu trả lời được gửi vào biểu mẫu. CCCD/điện thoại có thể đọc từng chữ số, ví dụ “không, bảy, chín…”.
 
-Bộ câu hỏi thay đổi theo biểu mẫu đang chọn ở Bước 1 (`services/interview_service.py`, `TEMPLATE_STEPS`): mẫu trợ cấp hưu trí hỏi về bản thân người đề nghị; hai mẫu hỏa táng/mai táng hỏi thêm về người đã mất (họ tên, ngày mất là bắt buộc; ngày sinh, giới tính, dân tộc, nơi cư trú, CCCD, nơi/nguyên nhân mất, giấy chứng tử là tùy chọn) và tổ chức đứng ra lo hậu sự nếu có. Thêm biểu mẫu mới thì cũng cần thêm một bộ câu hỏi tương ứng vào `TEMPLATE_STEPS`, nếu không trợ lý sẽ dùng lại bộ câu hỏi của mẫu trợ cấp hưu trí.
+Bộ câu hỏi thay đổi theo biểu mẫu đang chọn ở Bước 1 (`services/interview_service.py`, `TEMPLATE_STEPS`): mẫu trợ cấp hưu trí hỏi về bản thân người đề nghị; hai mẫu hỏa táng/mai táng hỏi thêm về người đã mất; hai mẫu NQ32/NQ40 hỏi ngày/nơi cấp CCCD, thường trú, tạm trú, nghề nghiệp, đơn vị công tác và một trong năm nhóm hỗ trợ. Thêm biểu mẫu mới thì cũng cần thêm một bộ câu hỏi tương ứng vào `TEMPLATE_STEPS`, nếu không trợ lý sẽ dùng lại bộ câu hỏi của mẫu trợ cấp hưu trí.
 
 Để trợ lý **đọc** câu hỏi bằng tiếng Việt, trình duyệt phải có một giọng đọc TTS tiếng Việt. Giao diện chỉ chọn giọng có ngôn ngữ `vi`/`vi-VN`; nếu không có, câu hỏi vẫn hiện bằng chữ và ứng dụng nêu hướng dẫn cài đặt thay vì đọc bằng giọng tiếng Anh. Trên Windows, vào **Cài đặt > Giọng nói hoặc Trình tường thuật > Thêm giọng nói**, thêm **Tiếng Việt**, rồi khởi động lại Chrome/Edge. Microsoft liệt kê giọng tiếng Việt là **An** trong [danh sách ngôn ngữ và giọng TTS được hỗ trợ](https://support.microsoft.com/vi-vn/accessibility/windows/narrator/appendix-a-supported-languages-and-voices).
 

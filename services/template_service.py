@@ -52,6 +52,36 @@ TEMPLATES = {
         download_name="to-khai-de-nghi-ho-tro-chi-phi-mai-tang",
         required_fields=_DECEASED_BENEFIT_REQUIRED_FIELDS,
     ),
+    "ho_tro_nq40": FormTemplate(
+        id="ho_tro_nq40",
+        title="Tờ khai thông tin cá nhân nhận hỗ trợ theo Nghị quyết số 40/NQ-HĐND",
+        file_name="ho_tro_nq40.docx",
+        download_name="to-khai-ho-tro-nghi-quyet-40",
+        required_fields=(
+            "full_name",
+            "date_of_birth",
+            "citizen_id",
+            "citizen_id_issue_date",
+            "citizen_id_issue_place",
+            "residence_address",
+            "support_category",
+        ),
+    ),
+    "ho_tro_nq32": FormTemplate(
+        id="ho_tro_nq32",
+        title="Tờ khai thông tin cá nhân nhận hỗ trợ theo Nghị quyết số 32/2025/NQ-HĐND",
+        file_name="ho_tro_nq32.docx",
+        download_name="to-khai-ho-tro-nghi-quyet-32",
+        required_fields=(
+            "full_name",
+            "date_of_birth",
+            "citizen_id",
+            "citizen_id_issue_date",
+            "citizen_id_issue_place",
+            "residence_address",
+            "support_category",
+        ),
+    ),
 }
 
 

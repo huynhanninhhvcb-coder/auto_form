@@ -150,10 +150,11 @@
             <label class="ai-consent" for="use-ai">
               <input id="use-ai" name="use_ai" type="checkbox" value="1" />
               <span>
-                <strong>Cho phép AI hỗ trợ nhận diện</strong>
+                <strong>Chế độ nhanh: cho phép AI đọc trực tiếp</strong>
                 <small
-                  >Chỉ bật khi bạn đồng ý gửi ảnh/PDF tới OpenAI. OCR Tesseract
-                  vẫn hoạt động khi không bật.</small
+                  >Khi bật, ảnh/PDF được gửi tới OpenAI và không phải chờ OCR
+                  Tesseract trên máy chủ chậm. Nếu không bật, tài liệu chỉ được
+                  xử lý cục bộ trên máy chủ.</small
                 >
               </span>
             </label>
@@ -407,6 +408,49 @@
 
           <div
             class="form-grid template-fields"
+            data-template="ho_tro_nq40 ho_tro_nq32"
+            hidden
+          >
+            <label class="input-group"
+              >Ngày cấp CCCD <em>*</em
+              ><input
+                name="citizen_id_issue_date"
+                placeholder="dd/mm/yyyy"
+                inputmode="numeric"
+                required
+            /></label>
+            <label class="input-group"
+              >Nơi cấp CCCD <em>*</em><input name="citizen_id_issue_place" required
+            /></label>
+            <label class="input-group wide"
+              >Nơi tạm trú (nếu có)<input name="temporary_address"
+            /></label>
+            <label class="input-group"
+              >Nghề nghiệp<input name="occupation"
+            /></label>
+            <label class="input-group"
+              >Đơn vị công tác<input name="employer"
+            /></label>
+            <label class="input-group wide"
+              >Đối tượng nhận hỗ trợ <em>*</em>
+              <select name="support_category" required>
+                <option value="">-- Chọn đối tượng --</option>
+                <option>Phụ nữ sinh đủ hai con trước 35 tuổi</option>
+                <option>Hộ nghèo</option>
+                <option>Hộ cận nghèo</option>
+                <option>Đối tượng bảo trợ xã hội</option>
+                <option>Đối tượng sống tại xã đảo</option>
+              </select>
+            </label>
+            <label class="input-group wide"
+              >Mã số hoặc thông tin cụ thể của đối tượng<input
+                name="support_detail"
+                placeholder="Ví dụ: mã hộ nghèo/cận nghèo hoặc diện bảo trợ xã hội"
+            /></label>
+          </div>
+
+          <div
+            class="form-grid template-fields"
             data-template="ho_tro_hoa_tang ho_tro_mai_tang"
             hidden
           >
@@ -512,7 +556,11 @@
             </div>
           </details>
 
-          <section class="bank-details" aria-labelledby="bank-details-title">
+          <section
+            class="bank-details template-fields"
+            data-template="tro_cap_huu_tri ho_tro_hoa_tang ho_tro_mai_tang"
+            aria-labelledby="bank-details-title"
+          >
             <div class="subsection-heading">
               <div>
                 <h3 id="bank-details-title">

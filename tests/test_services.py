@@ -14,9 +14,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app import create_app
 from config import Config
+from services.ai_extraction_service import AIExtractionError
 from services.batch_extraction_service import merge_extraction_results
 from services.docx_service import generate_document
 from services.extraction_service import extract_personal_information
+from services.ocr_service import OCRResult
 from services.template_service import get_template
 from services.validation_service import validate_form_data
 
@@ -77,6 +79,24 @@ class ExtractionAndValidationTests(unittest.TestCase):
         self.assertEqual(result.fields["date_of_birth"], "01/02/1950")
         self.assertEqual(result.fields["citizen_id"], "079150001234")
         self.assertEqual(result.fields["phone_number"], "0912345678")
+
+    def test_extracts_nq_support_fields_when_present_in_source_document(self):
+        result = extract_personal_information(
+            """Họ và tên: NGUYỄN THỊ MAI
+Ngày sinh: 01/02/1990
+CCCD số: 079090001234, Ngày cấp: 03/04/2021; Nơi cấp: Cục Cảnh sát QLHC về TTXH
+Nơi thường trú: 123 Lý Nam Đế, Phường Minh Phụng, Thành phố Hồ Chí Minh
+Nơi tạm trú (nếu có): 45 Nguyễn Trãi, Phường Bến Thành
+Số điện thoại: 0912 345 678
+Nghề nghiệp: Nhân viên
+Đơn vị công tác: Công ty A"""
+        )
+
+        self.assertEqual(result.fields["citizen_id_issue_date"], "03/04/2021")
+        self.assertIn("Cục Cảnh sát", result.fields["citizen_id_issue_place"])
+        self.assertIn("Nguyễn Trãi", result.fields["temporary_address"])
+        self.assertEqual(result.fields["occupation"], "Nhân viên")
+        self.assertEqual(result.fields["employer"], "Công ty A")
 
     def test_rejects_invalid_required_values(self):
         result = validate_form_data(
@@ -239,6 +259,7 @@ class DocumentAndRouteTests(unittest.TestCase):
         self.assertEqual(payload["ocr"]["max_workers"], self.app.config["OCR_MAX_WORKERS"])
         self.assertEqual(payload["ocr"]["target_width"], self.app.config["OCR_TARGET_WIDTH"])
         self.assertEqual(payload["ocr"]["fast_mode"], self.app.config["OCR_FAST_MODE"])
+        self.assertEqual(payload["ai_max_workers"], self.app.config["AI_MAX_WORKERS"])
 
     def test_document_contains_mapped_values(self):
         output = Path(self.temp_dir.name) / "filled.docx"
@@ -302,7 +323,73 @@ class DocumentAndRouteTests(unittest.TestCase):
 
         self.assertEqual(with_consent.status_code, 200)
         self.assertEqual(with_consent.get_json()["fields"]["date_of_birth"], "01/02/1980")
+        self.assertEqual(with_consent.get_json()["source"], "ai_vision")
         ai.assert_called_once()
+
+    def test_ai_consent_reads_image_directly_without_waiting_for_tesseract(self):
+        app = create_app(
+            {
+                "TESTING": True,
+                "UPLOAD_FOLDER": Path(self.temp_dir.name) / "direct-ai-uploads",
+                "OUTPUT_FOLDER": Path(self.temp_dir.name) / "direct-ai-outputs",
+                "OPENAI_API_KEY": "test-key",
+            }
+        )
+        image = Image.new("RGB", (400, 240), "white")
+        content = io.BytesIO()
+        image.save(content, format="PNG")
+        content.seek(0)
+
+        with (
+            patch(
+                "app.extract_missing_fields",
+                return_value={"full_name": "NGUYỄN VĂN THỬ", "citizen_id": "079000000001"},
+            ) as ai,
+            patch("app.ocr_image") as local_ocr,
+        ):
+            response = app.test_client().post(
+                "/api/extract",
+                data={"file": (content, "cccd.png"), "use_ai": "1"},
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["source"], "ai_vision")
+        self.assertEqual(response.get_json()["fields"]["citizen_id"], "079000000001")
+        ai.assert_called_once()
+        local_ocr.assert_not_called()
+
+    def test_ai_failure_falls_back_to_local_ocr_once(self):
+        app = create_app(
+            {
+                "TESTING": True,
+                "UPLOAD_FOLDER": Path(self.temp_dir.name) / "fallback-uploads",
+                "OUTPUT_FOLDER": Path(self.temp_dir.name) / "fallback-outputs",
+                "OPENAI_API_KEY": "test-key",
+            }
+        )
+        image = Image.new("RGB", (400, 240), "white")
+        content = io.BytesIO()
+        image.save(content, format="PNG")
+        content.seek(0)
+        ocr_result = OCRResult(text=SAMPLE_TEXT, pages=[SAMPLE_TEXT], source="ocr")
+
+        with (
+            patch("app.extract_missing_fields", side_effect=AIExtractionError("tạm thời lỗi")) as ai,
+            patch("app.ocr_image", return_value=ocr_result) as local_ocr,
+        ):
+            response = app.test_client().post(
+                "/api/extract",
+                data={"file": (content, "cccd.png"), "use_ai": "1"},
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["source"], "ocr")
+        self.assertEqual(response.get_json()["fields"]["citizen_id"], "079150001234")
+        self.assertTrue(any("đã chuyển sang OCR cục bộ" in item for item in response.get_json()["warnings"]))
+        ai.assert_called_once()
+        local_ocr.assert_called_once()
 
     def test_extract_endpoint_accepts_multiple_files_and_merges_fields(self):
         identity_pdf = make_text_pdf_bytes(
@@ -530,6 +617,45 @@ SO CCCD: 079150001234"""
         self.assertEqual(interview["fields"]["phone_number"], "0912345678")
         self.assertEqual(interview["fields"]["bank_account_number"], "123456789")
         self.assertEqual(interview["fields"]["contact_address"], interview["fields"]["residence_address"])
+
+    def test_nq_templates_have_voice_interview_and_normalize_support_category(self):
+        client = self.app.test_client()
+        for template_id in ("ho_tro_nq40", "ho_tro_nq32"):
+            with self.subTest(template_id=template_id):
+                interview = client.post(
+                    "/api/interview/start", json={"template_id": template_id}
+                ).get_json()
+                answers = {
+                    "full_name": "NGUYỄN THỊ MAI",
+                    "date_of_birth": "ngày một tháng hai năm một chín chín không",
+                    "citizen_id": "không bảy chín không chín không không không một hai ba bốn",
+                    "citizen_id_issue_date": "ngày ba tháng tư năm hai không hai một",
+                    "citizen_id_issue_place": "Cục Cảnh sát quản lý hành chính về trật tự xã hội",
+                    "residence_address": "123 Lý Nam Đế, Phường Minh Phụng",
+                    "phone_number": "không chín một hai ba bốn năm sáu bảy tám",
+                    "support_category": "Tôi thuộc hộ cận nghèo",
+                    "support_detail": "CN-123",
+                }
+                asked_fields = []
+                for _ in range(20):
+                    if interview["complete"]:
+                        break
+                    asked_fields.append(interview["field"])
+                    response = client.post(
+                        "/api/interview/answer",
+                        json={
+                            "session_id": interview["session_id"],
+                            "answer": answers.get(interview["field"], "bỏ qua"),
+                        },
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    interview = response.get_json()
+                    self.assertIsNone(interview["error"])
+                self.assertTrue(interview["complete"])
+                self.assertIn("citizen_id_issue_date", asked_fields)
+                self.assertIn("support_category", asked_fields)
+                self.assertEqual(interview["fields"]["citizen_id_issue_date"], "03/04/2021")
+                self.assertEqual(interview["fields"]["support_category"], "Hộ cận nghèo")
 
     def test_hoa_tang_interview_asks_about_deceased_instead_of_retirement_fields(self):
         client = self.app.test_client()

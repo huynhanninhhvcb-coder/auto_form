@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from docx import Document
@@ -193,6 +194,7 @@ def generate_document(template: FormTemplate, raw_fields: dict, output_path: str
     fields.update({key: _set_field_value(value) for key, value in raw_fields.items()})
     fields["citizen_id"] = normalize_citizen_id(fields.get("citizen_id"))
     fields["date_of_birth"] = normalize_date(fields.get("date_of_birth"))
+    fields["citizen_id_issue_date"] = normalize_date(fields.get("citizen_id_issue_date"))
     fields["guardian_date_of_birth"] = normalize_date(fields.get("guardian_date_of_birth"))
     fields["phone_number"] = normalize_phone(fields.get("phone_number"))
     fields["guardian_phone"] = normalize_phone(fields.get("guardian_phone"))
@@ -201,6 +203,27 @@ def generate_document(template: FormTemplate, raw_fields: dict, output_path: str
     fields["deceased_death_date"] = normalize_date(fields.get("deceased_death_date"))
     fields["death_certificate_date"] = normalize_date(fields.get("death_certificate_date"))
     fields["org_phone"] = normalize_phone(fields.get("org_phone"))
+
+    support_category = fields.get("support_category", "").casefold()
+    support_options = {
+        "support_two_children_check": "phụ nữ sinh đủ hai con trước 35 tuổi",
+        "support_poor_check": "hộ nghèo",
+        "support_near_poor_check": "hộ cận nghèo",
+        "support_social_check": "đối tượng bảo trợ xã hội",
+        "support_island_check": "đối tượng sống tại xã đảo",
+    }
+    for token, label in support_options.items():
+        fields[token] = "☒" if support_category == label.casefold() else "☐"
+    fields["support_poor_detail"] = fields.get("support_detail", "") if support_category == "hộ nghèo" else ""
+    fields["support_near_poor_detail"] = fields.get("support_detail", "") if support_category == "hộ cận nghèo" else ""
+    fields["support_social_detail"] = fields.get("support_detail", "") if support_category == "đối tượng bảo trợ xã hội" else ""
+    fields["support_island_detail"] = fields.get("support_detail", "") if support_category == "đối tượng sống tại xã đảo" else ""
+    today = date.today()
+    fields.update(
+        declaration_day=f"{today.day:02d}",
+        declaration_month=f"{today.month:02d}",
+        declaration_year=str(today.year),
+    )
 
     try:
         document = Document(template.path)

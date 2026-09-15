@@ -21,6 +21,8 @@ services:
         value: vie
       - key: OCR_FAST_MODE
         value: "true"
+      - key: AI_MAX_WORKERS
+        value: "3"
       - key: GOOGLE_DRIVE_API_KEY
         sync: false
       - key: MAU_DON_FOLDER_ID

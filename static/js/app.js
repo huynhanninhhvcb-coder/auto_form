@@ -565,7 +565,14 @@
     const button = document.querySelector('#extract-button');
     uploadInProgress = true;
     renderSelectedFiles();
-    setBusy(button, true, files.length > 1 ? `Đang quét ${files.length} tệp…` : 'Đang trích xuất…');
+    const processingLabel = useAi?.checked
+      ? files.length > 1
+        ? `AI đang đọc ${files.length} tệp…`
+        : 'AI đang đọc tài liệu…'
+      : files.length > 1
+        ? `Đang quét ${files.length} tệp…`
+        : 'Đang trích xuất…';
+    setBusy(button, true, processingLabel);
     status.hidden = true;
     clearErrors();
     try {

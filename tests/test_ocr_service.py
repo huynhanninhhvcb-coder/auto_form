@@ -12,6 +12,7 @@ from services.ocr_service import (
     _looks_like_cccd,
     _prepare_image,
     _split_stacked_cccd,
+    _split_stacked_cccd_on_separator,
     ocr_pil_image,
 )
 
@@ -105,6 +106,46 @@ class CccdDetectionTests(unittest.TestCase):
 
 
 class StackedCccdSplitTests(unittest.TestCase):
+    def test_detects_dark_separator_without_running_ocr_first(self):
+        composite = Image.new("RGB", (1000, 1360), "white")
+        for y in range(670, 690):
+            for x in range(composite.width):
+                composite.putpixel((x, y), (20, 20, 20))
+
+        halves = _split_stacked_cccd_on_separator(composite)
+
+        self.assertIsNotNone(halves)
+        front, back = halves
+        self.assertLess(front.height, composite.height)
+        self.assertLess(back.height, composite.height)
+
+    def test_fast_mode_reads_separator_composite_in_two_passes(self):
+        composite = Image.new("RGB", (1000, 1360), "white")
+        for y in range(670, 690):
+            for x in range(composite.width):
+                composite.putpixel((x, y), (20, 20, 20))
+        front_text = "CĂN CƯỚC CÔNG DÂN\nHọ và tên: NGUYỄN VĂN THỬ"
+
+        with (
+            patch("services.ocr_service._detect_document_crop", return_value=composite),
+            patch(
+                "services.ocr_service.pytesseract.image_to_string",
+                return_value=front_text,
+            ) as image_to_string,
+            patch("services.ocr_service._ocr_cccd_mrz", return_value="IDVNM") as mrz,
+        ):
+            ocr_pil_image(
+                composite,
+                languages=["vie", "eng"],
+                max_workers=1,
+                fast_mode=True,
+            )
+
+        # Một lượt mặt trước + một lượt MRZ (mock riêng), không còn lượt bố cục.
+        image_to_string.assert_called_once()
+        mrz.assert_called_once()
+        self.assertLess(image_to_string.call_args.args[0].height, composite.height)
+
     def test_splits_a_front_and_back_composite_into_two_card_shaped_halves(self):
         # Người dân thường ghép mặt trước (trên) và mặt sau (dưới) CCCD vào
         # chung một tệp ảnh; tỉ lệ khung ảnh tổng thể khi đó xấp xỉ 0.65-0.95.

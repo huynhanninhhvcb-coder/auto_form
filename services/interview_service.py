@@ -110,10 +110,38 @@ _HO_TRO_MAI_TANG_STEPS: tuple[InterviewStep, ...] = (
     InterviewStep("org_phone", "Số điện thoại của tổ chức là gì?"),
 )
 
+_HO_TRO_NGHI_QUYET_STEPS: tuple[InterviewStep, ...] = (
+    InterviewStep("full_name", "Vui lòng cho biết họ và tên đầy đủ của bạn, đúng như trên CCCD.", True),
+    InterviewStep("date_of_birth", "Ngày, tháng, năm sinh của bạn là gì? Ví dụ: 30/05/1990.", True),
+    InterviewStep("citizen_id", "Vui lòng đọc từng chữ số CCCD, gồm đúng 12 số.", True),
+    InterviewStep("citizen_id_issue_date", "CCCD của bạn được cấp ngày, tháng, năm nào?", True),
+    InterviewStep("citizen_id_issue_place", "CCCD của bạn do cơ quan nào cấp?", True),
+    InterviewStep(
+        "residence_address",
+        "Hộ khẩu thường trú của bạn ở đâu? Hãy nêu đầy đủ số nhà, đường, phường xã, quận huyện và tỉnh thành phố.",
+        True,
+    ),
+    InterviewStep("temporary_address", "Nơi tạm trú hiện nay của bạn ở đâu? Nếu không có, hãy trả lời bỏ qua."),
+    InterviewStep("phone_number", "Số điện thoại liên hệ của bạn là gì? Hãy đọc từng chữ số."),
+    InterviewStep("occupation", "Nghề nghiệp hiện nay của bạn là gì?"),
+    InterviewStep("employer", "Đơn vị công tác của bạn là gì? Nếu không có, hãy trả lời bỏ qua."),
+    InterviewStep(
+        "support_category",
+        "Bạn thuộc nhóm hỗ trợ nào? Hãy trả lời một trong năm nhóm: phụ nữ sinh đủ hai con trước 35 tuổi; hộ nghèo; hộ cận nghèo; đối tượng bảo trợ xã hội; hoặc đối tượng sống tại xã đảo.",
+        True,
+    ),
+    InterviewStep(
+        "support_detail",
+        "Nếu thuộc hộ nghèo hoặc hộ cận nghèo, hãy cho biết mã số. Nếu thuộc diện bảo trợ xã hội hoặc sống tại xã đảo, hãy nêu thông tin cụ thể. Trường hợp khác có thể trả lời bỏ qua.",
+    ),
+)
+
 TEMPLATE_STEPS: dict[str, tuple[InterviewStep, ...]] = {
     "tro_cap_huu_tri": _TRO_CAP_HUU_TRI_STEPS,
     "ho_tro_hoa_tang": _HO_TRO_HOA_TANG_STEPS,
     "ho_tro_mai_tang": _HO_TRO_MAI_TANG_STEPS,
+    "ho_tro_nq40": _HO_TRO_NGHI_QUYET_STEPS,
+    "ho_tro_nq32": _HO_TRO_NGHI_QUYET_STEPS,
 }
 
 SKIP_ANSWERS = {"bo qua", "khong co", "khong nho", "khong ap dung", "skip"}
@@ -264,7 +292,7 @@ class InterviewService:
             value = normalize_citizen_id(_spoken_digits(value) or value)
             if not re.fullmatch(r"\d{12}", value):
                 return "", "Số CCCD/số định danh phải gồm đúng 12 chữ số. Vui lòng đọc lại từng số."
-        elif field in {"date_of_birth", "guardian_date_of_birth", "deceased_date_of_birth", "deceased_death_date", "death_certificate_date"}:
+        elif field in {"date_of_birth", "citizen_id_issue_date", "guardian_date_of_birth", "deceased_date_of_birth", "deceased_death_date", "death_certificate_date"}:
             value = _normalise_spoken_date(value)
             validation = validate_form_data({field: value}, ())
             if field in validation.errors:
@@ -284,6 +312,17 @@ class InterviewService:
                 value = "Khác"
             else:
                 return "", "Vui lòng trả lời Nam, Nữ hoặc Khác."
+        elif field == "support_category":
+            categories = (
+                (r"(?:hai|2)\s*con|truoc\s*(?:ba\s*muoi\s*lam|35)", "Phụ nữ sinh đủ hai con trước 35 tuổi"),
+                (r"can\s*ngheo", "Hộ cận nghèo"),
+                (r"ho\s*ngheo|ngheo", "Hộ nghèo"),
+                (r"bao\s*tro\s*xa\s*hoi", "Đối tượng bảo trợ xã hội"),
+                (r"xa\s*dao|song\s*tai\s*dao", "Đối tượng sống tại xã đảo"),
+            )
+            value = next((label for pattern, label in categories if re.search(pattern, folded)), "")
+            if not value:
+                return "", "Vui lòng chọn một trong năm nhóm hỗ trợ vừa được nêu trong câu hỏi."
         elif field == "contact_address" and "giong noi cu tru" in folded:
             value = known_fields.get("residence_address", "")
             if not value:

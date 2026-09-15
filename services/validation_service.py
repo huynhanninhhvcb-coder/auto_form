@@ -35,6 +35,7 @@ def validate_form_data(data: dict, required_fields: tuple[str, ...] | list[str])
 
     for date_key in (
         "date_of_birth",
+        "citizen_id_issue_date",
         "guardian_date_of_birth",
         "deceased_date_of_birth",
         "deceased_death_date",
@@ -74,5 +75,16 @@ def validate_form_data(data: dict, required_fields: tuple[str, ...] | list[str])
     account_number = bank_fields["bank_account_number"]
     if account_number and not re.fullmatch(r"\d{6,19}", account_number):
         errors["bank_account_number"] = "Số tài khoản phải gồm từ 6 đến 19 chữ số."
+
+    support_category = clean_data.get("support_category", "")
+    allowed_support_categories = {
+        "Phụ nữ sinh đủ hai con trước 35 tuổi",
+        "Hộ nghèo",
+        "Hộ cận nghèo",
+        "Đối tượng bảo trợ xã hội",
+        "Đối tượng sống tại xã đảo",
+    }
+    if support_category and support_category not in allowed_support_categories:
+        errors["support_category"] = "Vui lòng chọn đúng một đối tượng nhận hỗ trợ trong danh sách."
 
     return ValidationResult(errors=errors, warnings=warnings)

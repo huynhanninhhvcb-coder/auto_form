@@ -148,5 +148,40 @@ class DeceasedBenefitDocxMappingTests(unittest.TestCase):
         self.assertNotIn("{{", text)
 
 
+class NqSupportDocxMappingTests(unittest.TestCase):
+    def test_both_nq_templates_fill_fields_and_select_exactly_one_category(self):
+        fields = {
+            "full_name": "NGUYỄN THỊ MAI",
+            "date_of_birth": "1-2-1990",
+            "citizen_id": "079 090 001 234",
+            "citizen_id_issue_date": "3-4-2021",
+            "citizen_id_issue_place": "Cục Cảnh sát QLHC về TTXH",
+            "residence_address": "123 Lý Nam Đế, Phường Minh Phụng",
+            "temporary_address": "Như trên",
+            "phone_number": "0912 345 678",
+            "occupation": "Nhân viên",
+            "employer": "Công ty A",
+            "support_category": "Hộ cận nghèo",
+            "support_detail": "CN-123",
+        }
+        for template_id, resolution in (
+            ("ho_tro_nq40", "40/NQ-HĐND"),
+            ("ho_tro_nq32", "32/2025/NQ-HĐND"),
+        ):
+            with self.subTest(template_id=template_id), tempfile.TemporaryDirectory() as temporary_directory:
+                output = Path(temporary_directory) / "filled.docx"
+                generate_document(get_template(template_id), fields, output)
+                text = _full_text(Document(output))
+
+            self.assertIn(resolution, text)
+            self.assertIn("NGUYỄN THỊ MAI", text)
+            self.assertIn("079090001234", text)
+            self.assertIn("03/04/2021", text)
+            self.assertIn("CN-123", text)
+            self.assertEqual(text.count("☒"), 1)
+            self.assertEqual(text.count("☐"), 4)
+            self.assertNotIn("{{", text)
+
+
 if __name__ == "__main__":
     unittest.main()

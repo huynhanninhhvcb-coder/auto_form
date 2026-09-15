@@ -252,6 +252,51 @@ def _split_stacked_cccd(image: Image.Image) -> tuple[Image.Image, Image.Image] |
     return top, bottom
 
 
+def _split_stacked_cccd_on_separator(image: Image.Image) -> tuple[Image.Image, Image.Image] | None:
+    """Nhận biết ảnh ghép hai mặt qua dải phân cách tối gần giữa ảnh.
+
+    Nhiều ảnh CCCD do điện thoại/ứng dụng ghép tạo một dải đen ngang giữa hai
+    mặt. Tín hiệu hình học này cho phép tách trước lượt OCR đầu tiên, tránh bắt
+    Tesseract đọc cả hai mặt trong một ảnh dọc rất lớn. Văn bản dọc thông thường
+    không thể bị nhầm vì phải có ít nhất 70% chiều ngang gần như đen.
+    """
+    halves = _split_stacked_cccd(image)
+    if halves is None:
+        return None
+
+    sample_width = min(400, image.width)
+    scale = sample_width / image.width
+    sample = ImageOps.grayscale(
+        image.resize(
+            (sample_width, max(1, round(image.height * scale))),
+            Image.Resampling.BILINEAR,
+        )
+    )
+    width, height = sample.size
+    start = round(height * 0.42)
+    end = round(height * 0.58)
+    separator_rows: list[int] = []
+    for y in range(start, end):
+        histogram = sample.crop((0, y, width, y + 1)).histogram()
+        dark_ratio = sum(histogram[:70]) / width
+        if dark_ratio >= 0.70:
+            separator_rows.append(y)
+    if len(separator_rows) < 2:
+        return None
+
+    split_y = round((separator_rows[0] + separator_rows[-1]) / 2 / scale)
+    # Preserve the text line immediately above/below the separator.  Some
+    # photographed cards place the residence line very close to the divider.
+    overlap = round(image.height * 0.035)
+    front = image.crop((0, 0, image.width, min(image.height, split_y + overlap)))
+    back = image.crop((0, max(0, split_y - overlap), image.width, image.height))
+    if front.height == 0 or back.height == 0:
+        return None
+    if image.width / front.height < 1.25 or image.width / back.height < 1.25:
+        return None
+    return front, back
+
+
 def _ocr_cccd_mrz(
     image: Image.Image,
     languages: list[str],
@@ -327,7 +372,11 @@ def ocr_pil_image(
         warnings.append("Máy chủ chưa cài dữ liệu tiếng Việt cho Tesseract; kết quả OCR có thể sai dấu.")
     try:
         image = _detect_document_crop(image)
-        prepared = _prepare_image(image, target_width=target_width)
+        separator_halves = _split_stacked_cccd_on_separator(image) if fast_mode else None
+        # Ảnh ghép có dải phân cách được tách ngay: lượt chính chỉ đọc mặt
+        # trước. Mặt sau sẽ đi thẳng vào OCR MRZ chuyên biệt bên dưới.
+        primary_image = separator_halves[0] if separator_halves is not None else image
+        prepared = _prepare_image(primary_image, target_width=target_width)
         text = pytesseract.image_to_string(prepared, lang=language, config="--oem 3 --psm 6")
     except TesseractNotFoundError as error:
         raise OCRUnavailableError("Không thể khởi chạy Tesseract OCR.") from error
@@ -337,15 +386,19 @@ def ocr_pil_image(
     primary_text = text.strip()
     page_texts = [primary_text] if primary_text else []
     mrz_texts: list[str] = []
-    if _looks_like_cccd(text, prepared):
+    if separator_halves is not None or _looks_like_cccd(text, prepared):
         # Một ảnh đơn thường chỉ là mặt trước HOẶC mặt sau. Ở chế độ nhanh,
         # mặt trước chỉ cần OCR bố cục, mặt sau chỉ cần OCR MRZ; trước đây cả
         # hai lượt đều chạy cho mọi mặt thẻ dù một lượt chắc chắn vô ích.
         folded_text = _fold_for_detection(text)
         has_mrz_marker = bool(re.search(r"\b[1il]dvnm", folded_text))
-        stacked_halves = _split_stacked_cccd(image)
-        run_layout = not fast_mode or not has_mrz_marker or stacked_halves is not None
-        run_mrz = not fast_mode or has_mrz_marker or stacked_halves is not None
+        stacked_halves = separator_halves or _split_stacked_cccd(image)
+        if fast_mode and separator_halves is not None:
+            # PSM 6 vừa đọc riêng mặt trước nên không lặp thêm PSM 11.
+            run_layout, run_mrz = False, True
+        else:
+            run_layout = not fast_mode or not has_mrz_marker or stacked_halves is not None
+            run_mrz = not fast_mode or has_mrz_marker or stacked_halves is not None
 
         layout_image = prepared
         if stacked_halves is not None:

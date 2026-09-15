@@ -81,6 +81,9 @@ class Config:
     # Để trống OPENAI_API_KEY để tắt hẳn tính năng này (không tốn phí, không gọi mạng ngoài).
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    # Các lời gọi vision dùng CPU của OpenAI, không phải CPU Render. Cho phép
+    # xử lý đồng thời tối đa ba tệp khi người dân bật chế độ AI nhanh.
+    AI_MAX_WORKERS = _bounded_env_int("AI_MAX_WORKERS", 3, 1, 5)
 
     # Chatbot thủ tục hành chính (widget góc phải dưới).
     THUTUC_FOLDER = BASE_DIR / "thutuc_data"

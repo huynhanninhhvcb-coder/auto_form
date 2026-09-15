@@ -20,6 +20,7 @@ ENV PYTHONUNBUFFERED=1 \
     OCR_TARGET_WIDTH=1200 \
     OCR_LANGUAGE=vie \
     OCR_FAST_MODE=true \
+    AI_MAX_WORKERS=3 \
     OMP_THREAD_LIMIT=1 \
     OMP_NUM_THREADS=1
 # Tesseract build sẵn trên Debian bật OpenMP cho mạng LSTM: mặc định nó tự

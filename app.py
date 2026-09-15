@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 import io
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 from flask import Flask, jsonify, render_template, request, send_file, session
@@ -16,12 +18,13 @@ from services.batch_extraction_service import merge_extraction_results
 import services.chatbot_ai_service as chatbot_ai_service
 import services.chatbot_service as chatbot_service
 from services.docx_service import DocumentGenerationError, generate_document
-from services.extraction_service import extract_personal_information
+from services.extraction_service import FIELD_NAMES, extract_personal_information
 from services.interview_service import InterviewNotFoundError, InterviewService
-from services.ocr_service import OCRUnavailableError, ocr_image
+from services.ocr_service import OCRResult, OCRUnavailableError, ocr_image
 from services.pdf_service import PDFProcessingError, process_pdf
 from services.template_service import get_template, list_templates
 from services.validation_service import validate_form_data
+from models.database import ExtractionResult
 
 
 class UploadTooLargeError(ValueError):
@@ -75,13 +78,134 @@ _AI_EXTRACTABLE_FIELDS = (
     "gender",
     "ethnic_group",
     "citizen_id",
+    "citizen_id_issue_date",
+    "citizen_id_issue_place",
     "residence_address",
     "contact_address",
+    "temporary_address",
     "phone_number",
+    "occupation",
+    "employer",
+    "support_category",
+    "support_detail",
     "bank_account_name",
     "bank_account_number",
     "bank_name",
+    "deceased_full_name",
+    "deceased_date_of_birth",
+    "deceased_gender",
+    "deceased_ethnic_group",
+    "deceased_nationality",
+    "deceased_citizen_id",
+    "deceased_residence_address",
+    "deceased_death_date",
+    "deceased_death_place",
+    "deceased_death_cause",
+    "death_certificate_number",
+    "death_certificate_date",
+    "death_certificate_issuer",
 )
+
+
+# Nếu AI trực tiếp gặp lỗi trong một batch, các tệp có thể cùng rơi về Tesseract.
+# Khóa này giữ đúng một OCR tại một thời điểm trên Render Free; các lời gọi AI
+# bình thường vẫn được chạy song song vì chúng không tiêu tốn CPU của Render.
+_AI_FALLBACK_OCR_LOCK = Lock()
+
+
+def _direct_ai_extraction(app: Flask, filepath: Path, extension: str) -> tuple[OCRResult, ExtractionResult] | None:
+    """Đọc tài liệu trực tiếp bằng vision khi người dân đã đồng ý gửi tới OpenAI."""
+    ai_fields = extract_missing_fields(
+        filepath,
+        extension,
+        list(_AI_EXTRACTABLE_FIELDS),
+        api_key=app.config["OPENAI_API_KEY"],
+        model=app.config["OPENAI_MODEL"],
+        max_pages=app.config["MAX_PDF_PAGES"],
+    )
+    if not ai_fields:
+        return None
+
+    fields = {field: "" for field in FIELD_NAMES}
+    confidence = {field: "missing" for field in FIELD_NAMES}
+    for field, value in ai_fields.items():
+        if field not in fields or not value:
+            continue
+        fields[field] = value
+        confidence[field] = "medium"
+
+    processed = OCRResult(
+        text="",
+        warnings=[
+            "Tệp được AI nhận diện trực tiếp để tránh thời gian chờ OCR trên máy chủ; "
+            "hãy đối chiếu giấy tờ gốc trước khi tạo đơn."
+        ],
+        source="ai_vision",
+        # Không lưu bản chép nội dung tài liệu; phần tử rỗng chỉ biểu thị một
+        # tài liệu đã được xử lý trong metadata phản hồi.
+        pages=[""],
+    )
+    return processed, ExtractionResult(fields=fields, confidence=confidence)
+
+
+def _local_ocr_extraction(app: Flask, filepath: Path, extension: str) -> tuple[OCRResult, ExtractionResult]:
+    if extension == "pdf":
+        processed = process_pdf(
+            filepath,
+            max_pages=app.config["MAX_PDF_PAGES"],
+            tesseract_cmd=app.config.get("TESSERACT_CMD"),
+            max_workers=app.config["OCR_MAX_WORKERS"],
+            target_width=app.config["OCR_TARGET_WIDTH"],
+            preferred_language=app.config.get("OCR_LANGUAGE"),
+            fast_mode=app.config["OCR_FAST_MODE"],
+        )
+    else:
+        processed = ocr_image(
+            filepath,
+            tesseract_cmd=app.config.get("TESSERACT_CMD"),
+            max_workers=app.config["OCR_MAX_WORKERS"],
+            target_width=app.config["OCR_TARGET_WIDTH"],
+            preferred_language=app.config.get("OCR_LANGUAGE"),
+            fast_mode=app.config["OCR_FAST_MODE"],
+        )
+    extracted = extract_personal_information(
+        processed.text,
+        page_texts=processed.pages,
+        cccd_mrz_texts=processed.mrz_texts,
+    )
+    return processed, extracted
+
+
+def _process_upload_content(
+    app: Flask,
+    filepath: Path,
+    extension: str,
+    *,
+    ai_consented: bool,
+) -> tuple[OCRResult, ExtractionResult]:
+    """Ưu tiên AI vision khi có đồng ý; nếu API lỗi thì quay về OCR cục bộ."""
+    use_direct_ai = ai_consented and is_configured(app.config)
+    ai_warning = ""
+    if use_direct_ai:
+        try:
+            direct_result = _direct_ai_extraction(app, filepath, extension)
+        except AIExtractionError as error:
+            ai_warning = f"AI nhận diện trực tiếp không khả dụng ({error}); đã chuyển sang OCR cục bộ."
+        else:
+            if direct_result is not None:
+                return direct_result
+            ai_warning = "AI không nhận diện được trường thông tin nào; đã chuyển sang OCR cục bộ."
+
+    # Một batch AI có thể gọi nhiều tệp đồng thời. Chỉ khóa nhánh fallback để
+    # không vô tình chạy nhiều Tesseract cùng lúc khi OpenAI gặp sự cố.
+    fallback_context = _AI_FALLBACK_OCR_LOCK if use_direct_ai else nullcontext()
+    with fallback_context:
+        processed, extracted = _local_ocr_extraction(app, filepath, extension)
+    if ai_warning:
+        processed.warnings.append(ai_warning)
+    else:
+        _enhance_with_ai(app, filepath, extension, processed, extracted, consented=ai_consented)
+    return processed, extracted
 
 
 def _enhance_with_ai(
@@ -172,31 +296,12 @@ def _process_saved_upload(app: Flask, name: str, filepath: Path, extension: str,
     của yêu cầu và độc lập giữa các tệp.
     """
     try:
-        if extension == "pdf":
-            processed = process_pdf(
-                filepath,
-                max_pages=app.config["MAX_PDF_PAGES"],
-                tesseract_cmd=app.config.get("TESSERACT_CMD"),
-                max_workers=app.config["OCR_MAX_WORKERS"],
-                target_width=app.config["OCR_TARGET_WIDTH"],
-                preferred_language=app.config.get("OCR_LANGUAGE"),
-                fast_mode=app.config["OCR_FAST_MODE"],
-            )
-        else:
-            processed = ocr_image(
-                filepath,
-                tesseract_cmd=app.config.get("TESSERACT_CMD"),
-                max_workers=app.config["OCR_MAX_WORKERS"],
-                target_width=app.config["OCR_TARGET_WIDTH"],
-                preferred_language=app.config.get("OCR_LANGUAGE"),
-                fast_mode=app.config["OCR_FAST_MODE"],
-            )
-        extracted = extract_personal_information(
-            processed.text,
-            page_texts=processed.pages,
-            cccd_mrz_texts=processed.mrz_texts,
+        processed, extracted = _process_upload_content(
+            app,
+            filepath,
+            extension,
+            ai_consented=ai_consented,
         )
-        _enhance_with_ai(app, filepath, extension, processed, extracted, consented=ai_consented)
     except OCRUnavailableError as error:
         return {
             "name": name,
@@ -287,7 +392,14 @@ def _extract_batch(app: Flask, uploads: list):
         saved_files.append((index, name, filepath, extension))
 
     if saved_files:
-        batch_workers = min(len(saved_files), app.config["OCR_MAX_WORKERS"])
+        # AI chạy ở hạ tầng OpenAI nên có thể xử lý nhiều tệp đồng thời mà
+        # không tranh 0.1 CPU của Render. OCR cục bộ vẫn giữ đúng một worker.
+        worker_limit = (
+            app.config["AI_MAX_WORKERS"]
+            if ai_consented and is_configured(app.config)
+            else app.config["OCR_MAX_WORKERS"]
+        )
+        batch_workers = min(len(saved_files), worker_limit)
         with ThreadPoolExecutor(max_workers=batch_workers) as executor:
             outcomes = list(
                 executor.map(
@@ -375,6 +487,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             tesseract_configured=bool(app.config.get("TESSERACT_CMD")),
             ai_configured=is_configured(app.config),
             ai_model=app.config.get("OPENAI_MODEL") if is_configured(app.config) else None,
+            ai_max_workers=app.config["AI_MAX_WORKERS"],
             ocr={
                 "max_workers": app.config["OCR_MAX_WORKERS"],
                 "target_width": app.config["OCR_TARGET_WIDTH"],
@@ -473,37 +586,11 @@ def create_app(test_config: dict | None = None) -> Flask:
 
         try:
             _save_upload_with_limit(upload, filepath, app.config["MAX_FILE_SIZE"])
-            if extension == "pdf":
-                processed = process_pdf(
-                    filepath,
-                    max_pages=app.config["MAX_PDF_PAGES"],
-                    tesseract_cmd=app.config.get("TESSERACT_CMD"),
-                    max_workers=app.config["OCR_MAX_WORKERS"],
-                    target_width=app.config["OCR_TARGET_WIDTH"],
-                    preferred_language=app.config.get("OCR_LANGUAGE"),
-                    fast_mode=app.config["OCR_FAST_MODE"],
-                )
-            else:
-                processed = ocr_image(
-                    filepath,
-                    tesseract_cmd=app.config.get("TESSERACT_CMD"),
-                    max_workers=app.config["OCR_MAX_WORKERS"],
-                    target_width=app.config["OCR_TARGET_WIDTH"],
-                    preferred_language=app.config.get("OCR_LANGUAGE"),
-                    fast_mode=app.config["OCR_FAST_MODE"],
-                )
-            extracted = extract_personal_information(
-                processed.text,
-                page_texts=processed.pages,
-                cccd_mrz_texts=processed.mrz_texts,
-            )
-            _enhance_with_ai(
+            processed, extracted = _process_upload_content(
                 app,
                 filepath,
                 extension,
-                processed,
-                extracted,
-                consented=_ai_requested(),
+                ai_consented=_ai_requested(),
             )
         except OCRUnavailableError as error:
             return jsonify(
