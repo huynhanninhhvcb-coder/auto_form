@@ -428,6 +428,34 @@ SO DIEN THOAI: 0912 345 678"""
         self.assertIn("Tệp: lien-lac.pdf", result["raw_text"])
         self.assertEqual(list(Path(self.temp_dir.name, "uploads").iterdir()), [])
 
+    def test_extract_endpoint_cleans_up_batch_progress_after_finishing(self):
+        identity_pdf = make_text_pdf_bytes("HO VA TEN: NGUYEN VAN AN\nSO CCCD: 079150001234")
+        contact_pdf = make_text_pdf_bytes("SO DIEN THOAI: 0912 345 678")
+        client = self.app.test_client()
+
+        response = client.post(
+            "/api/extract",
+            data={
+                "files": [
+                    (io.BytesIO(identity_pdf), "cccd.pdf"),
+                    (io.BytesIO(contact_pdf), "lien-lac.pdf"),
+                ],
+                "batch_id": "test-batch-123",
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # Yêu cầu chính đã xong nên tiến trình phải được dọn ngay, không lưu lại mãi trong RAM.
+        progress = client.get("/api/extract/progress/test-batch-123").get_json()
+        self.assertEqual(progress, {"done": 0, "total": 0})
+
+    def test_extract_progress_endpoint_returns_zeros_for_unknown_batch(self):
+        client = self.app.test_client()
+        response = client.get("/api/extract/progress/khong-ton-tai")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"done": 0, "total": 0})
+
     def test_extract_batch_keeps_results_when_one_document_is_unreadable(self):
         identity_pdf = make_text_pdf_bytes(
             """HO VA TEN: NGUYEN VAN AN

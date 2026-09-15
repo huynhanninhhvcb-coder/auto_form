@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 import io
 from pathlib import Path
@@ -18,6 +18,7 @@ from services.batch_extraction_service import merge_extraction_results
 import services.chatbot_ai_service as chatbot_ai_service
 import services.chatbot_service as chatbot_service
 from services.docx_service import DocumentGenerationError, generate_document
+from services.extract_progress_service import ExtractProgressTracker
 from services.extraction_service import FIELD_NAMES, extract_personal_information
 from services.interview_service import InterviewNotFoundError, InterviewService
 from services.ocr_service import OCRResult, OCRUnavailableError, ocr_image
@@ -397,22 +398,38 @@ def _extract_batch(app: Flask, uploads: list):
             continue
         saved_files.append((index, name, filepath, extension))
 
+    progress_tracker = app.extensions["extract_progress"]
+    batch_id = request.form.get("batch_id", "").strip() or None
     if saved_files:
-        # AI chạy ở hạ tầng OpenAI nên có thể xử lý nhiều tệp đồng thời mà
-        # không tranh 0.1 CPU của Render. OCR cục bộ vẫn giữ đúng một worker.
-        worker_limit = (
-            app.config["AI_MAX_WORKERS"]
-            if ai_consented and is_configured(app.config)
-            else app.config["OCR_MAX_WORKERS"]
-        )
-        batch_workers = min(len(saved_files), worker_limit)
-        with ThreadPoolExecutor(max_workers=batch_workers) as executor:
-            outcomes = list(
-                executor.map(
-                    lambda item: _process_saved_upload(app, item[1], item[2], item[3], ai_consented),
-                    saved_files,
-                )
+        if batch_id:
+            progress_tracker.start(batch_id, len(saved_files))
+        try:
+            # AI chạy ở hạ tầng OpenAI nên có thể xử lý nhiều tệp đồng thời mà
+            # không tranh 0.1 CPU của Render. OCR cục bộ vẫn giữ đúng một worker.
+            worker_limit = (
+                app.config["AI_MAX_WORKERS"]
+                if ai_consented and is_configured(app.config)
+                else app.config["OCR_MAX_WORKERS"]
             )
+            batch_workers = min(len(saved_files), worker_limit)
+            with ThreadPoolExecutor(max_workers=batch_workers) as executor:
+                futures = {
+                    executor.submit(_process_saved_upload, app, item[1], item[2], item[3], ai_consented): item
+                    for item in saved_files
+                }
+                # Báo tiến trình theo đúng thứ tự tệp thực sự xong (đường AI có
+                # thể xử lý vài tệp đồng thời nên không nhất thiết theo thứ tự
+                # tải lên); vẫn dựng lại outcomes theo thứ tự gốc bên dưới vì
+                # phần ghép kết quả dựa vào đúng thứ tự đó.
+                outcomes_by_item = {}
+                for future in as_completed(futures):
+                    outcomes_by_item[futures[future]] = future.result()
+                    if batch_id:
+                        progress_tracker.advance(batch_id)
+                outcomes = [outcomes_by_item[item] for item in saved_files]
+        finally:
+            if batch_id:
+                progress_tracker.finish(batch_id)
     else:
         outcomes = []
 
@@ -475,6 +492,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     for folder_name in ("UPLOAD_FOLDER", "OUTPUT_FOLDER", "TEMPLATE_FOLDER", "THUTUC_FOLDER"):
         Path(app.config[folder_name]).mkdir(parents=True, exist_ok=True)
     app.extensions["interview_service"] = InterviewService(app.config["INTERVIEW_TTL_SECONDS"])
+    app.extensions["extract_progress"] = ExtractProgressTracker()
 
     @app.get("/")
     def index():
@@ -558,6 +576,14 @@ def create_app(test_config: dict | None = None) -> Flask:
             app.config.get("GOOGLE_DRIVE_API_KEY"), app.config.get("MAU_DON_FOLDER_ID")
         )
         return render_template("mau_don.html", folders=folders, error=error)
+
+    @app.get("/api/extract/progress/<batch_id>")
+    def extract_progress(batch_id: str):
+        # Không phải trạng thái xác thực gì: chỉ để giao diện hỏi "đã xử lý
+        # xong bao nhiêu tệp" trong khi yêu cầu /api/extract chính vẫn đang
+        # chạy. Trả {done: 0, total: 0} nếu batch_id không tồn tại (đã xong,
+        # bị dọn vì quá cũ, hoặc chưa từng có) để client không cần phân biệt.
+        return jsonify(app.extensions["extract_progress"].get(batch_id))
 
     @app.post("/api/extract")
     def extract():

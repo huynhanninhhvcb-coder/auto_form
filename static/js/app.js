@@ -575,10 +575,33 @@
     setBusy(button, true, processingLabel);
     status.hidden = true;
     clearErrors();
+    // Theo dõi tiến trình chỉ có ý nghĩa khi có nhiều tệp: batch mới lưu
+    // trạng thái theo batch_id ở backend, tệp đơn dùng đường xử lý khác
+    // không cập nhật tiến trình này.
+    let progressTimer = null;
+    let batchId = null;
+    if (files.length > 1) {
+      batchId = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      progressTimer = window.setInterval(async () => {
+        try {
+          const response = await fetch(`/api/extract/progress/${batchId}`);
+          if (!response.ok) return;
+          const progress = await response.json();
+          if (progress.total > 0) {
+            setBusy(button, true, `Đang xử lý ảnh ${progress.done}/${progress.total}…`);
+          }
+        } catch {
+          // Bỏ qua lỗi polling: chỉ ảnh hưởng dòng trạng thái, không ảnh hưởng kết quả trích xuất.
+        }
+      }, 700);
+    }
     try {
       const formData = new FormData();
       files.forEach((file) => formData.append('files', file));
       if (useAi?.checked) formData.append('use_ai', '1');
+      if (batchId) formData.append('batch_id', batchId);
       const response = await fetch('/api/extract', { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ? `${result.error} ${result.detail}` : result.error);
@@ -592,6 +615,7 @@
     } catch (error) {
       showStatus(error.message || 'Không thể xử lý tệp này.', 'error');
     } finally {
+      if (progressTimer) window.clearInterval(progressTimer);
       uploadInProgress = false;
       renderSelectedFiles();
       setBusy(button, false, 'Trích xuất thông tin');
