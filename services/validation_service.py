@@ -87,4 +87,13 @@ def validate_form_data(data: dict, required_fields: tuple[str, ...] | list[str])
     if support_category and support_category not in allowed_support_categories:
         errors["support_category"] = "Vui lòng chọn đúng một đối tượng nhận hỗ trợ trong danh sách."
 
+    payment_method = clean_data.get("payment_method", "")
+    if payment_method and payment_method not in {"Tài khoản ngân hàng", "Tiền mặt"}:
+        errors["payment_method"] = "Vui lòng chọn nhận qua tài khoản ngân hàng hoặc tiền mặt."
+
+    for time_field, maximum in (("deceased_death_hour", 23), ("deceased_death_minute", 59)):
+        value = clean_data.get(time_field, "")
+        if value and (not value.isdigit() or not 0 <= int(value) <= maximum):
+            errors[time_field] = f"Giá trị phải là số từ 0 đến {maximum}."
+
     return ValidationResult(errors=errors, warnings=warnings)

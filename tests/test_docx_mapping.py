@@ -17,6 +17,13 @@ def _paragraph_containing(document: Document, text: str) -> str:
     raise AssertionError(f"Không tìm thấy paragraph chứa {text!r}")
 
 
+def _line_containing(full_text: str, text: str) -> str:
+    for line in full_text.splitlines():
+        if text in line:
+            return line
+    raise AssertionError(f"Không tìm thấy dòng chứa {text!r}")
+
+
 class RetirementAssistanceDocxMappingTests(unittest.TestCase):
     def test_fills_multi_field_lines_at_their_own_labels(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -146,6 +153,47 @@ class DeceasedBenefitDocxMappingTests(unittest.TestCase):
             {"full_name": "NGUYỄN VĂN AN"},
         )
         self.assertNotIn("{{", text)
+
+    def test_hoa_tang_checks_exactly_the_selected_cremation_category(self):
+        text = self._generate(
+            "ho_tro_hoa_tang",
+            {
+                "full_name": "NGUYỄN VĂN AN",
+                "cremation_support_category": "Hộ cận nghèo",
+                "cremation_support_detail": "CN-456",
+            },
+        )
+        self.assertNotIn("{{", text)
+        near_poor_line = _line_containing(text, "Hộ cận nghèo")
+        self.assertTrue(near_poor_line.startswith("☒"))
+        self.assertIn("CN-456", near_poor_line)
+        # Đối tượng hộ nghèo không được chọn nên vẫn phải bỏ trống mã số của nó.
+        poor_line = _line_containing(text, "Hộ nghèo (")
+        self.assertTrue(poor_line.startswith("☐"))
+        self.assertNotIn("CN-456", poor_line)
+        # Toàn bộ 19 dòng đối tượng khác phải giữ nguyên "☐", chỉ một dòng "☒".
+        self.assertEqual(text.count("☒"), 1)
+
+    def test_mai_tang_checks_the_selected_payment_method_and_fills_death_time(self):
+        text = self._generate(
+            "ho_tro_mai_tang",
+            {
+                "full_name": "NGUYỄN VĂN AN",
+                "deceased_full_name": "NGUYỄN VĂN BA",
+                "deceased_death_date": "02/03/2025",
+                "deceased_death_hour": "14",
+                "deceased_death_minute": "5",
+                "payment_method": "Tiền mặt",
+                "request_content": "Đề nghị hỗ trợ chi phí mai táng",
+            },
+        )
+        self.assertNotIn("{{", text)
+        cash_line = _line_containing(text, "Tiền mặt")
+        self.assertTrue(cash_line.startswith("☒"))
+        bank_line = _line_containing(text, "Tài khoản ngân hàng")
+        self.assertTrue(bank_line.startswith("☐"))
+        self.assertIn("14 giờ 5 phút", text)
+        self.assertIn("Đề nghị hỗ trợ chi phí mai táng", text)
 
 
 class NqSupportDocxMappingTests(unittest.TestCase):

@@ -74,6 +74,12 @@ _HO_TRO_HOA_TANG_STEPS: tuple[InterviewStep, ...] = (
     InterviewStep("death_certificate_date", "Giấy chứng tử được cấp vào ngày, tháng, năm nào?"),
     InterviewStep("death_certificate_issuer", "Giấy chứng tử do cơ quan nào cấp?"),
     InterviewStep(
+        "cremation_support_category",
+        "Người đã mất thuộc đối tượng hỗ trợ hỏa táng nào? Ví dụ: Bà mẹ Việt Nam anh hùng, người khuyết tật, người cao tuổi, hộ nghèo, hộ cận nghèo, đối tượng hưu trí, hoặc người dân có hộ khẩu Thành phố Hồ Chí Minh.",
+        True,
+    ),
+    InterviewStep("cremation_support_detail", "Nếu là hộ nghèo hoặc hộ cận nghèo, vui lòng cho biết mã số. Trường hợp khác có thể nói bỏ qua."),
+    InterviewStep(
         "org_name",
         "Nếu bạn đại diện cho một tổ chức đứng ra lo việc hỏa táng, hãy cho biết tên tổ chức đó. Nếu không, trả lời “bỏ qua”.",
     ),
@@ -83,6 +89,7 @@ _HO_TRO_HOA_TANG_STEPS: tuple[InterviewStep, ...] = (
 _HO_TRO_MAI_TANG_STEPS: tuple[InterviewStep, ...] = (
     *_NGUOI_DE_NGHI_STEPS,
     InterviewStep("deceased_relationship", "Bạn có quan hệ gì với người đã mất?"),
+    InterviewStep("request_content", "Nội dung bạn đề nghị cơ quan giải quyết là gì?", True),
     InterviewStep("deceased_full_name", "Họ và tên đầy đủ của người đã mất là gì?", True),
     InterviewStep("deceased_date_of_birth", "Ngày, tháng, năm sinh của người đã mất là gì?"),
     InterviewStep("deceased_gender", "Giới tính của người đã mất là Nam hay Nữ?"),
@@ -94,12 +101,15 @@ _HO_TRO_MAI_TANG_STEPS: tuple[InterviewStep, ...] = (
         "Số CCCD hoặc số định danh cá nhân của người đã mất là gì? Vui lòng đọc từng chữ số, gồm 12 số.",
     ),
     InterviewStep("deceased_death_date", "Người đã mất qua đời vào ngày, tháng, năm nào? Ví dụ: 15/08/2026.", True),
+    InterviewStep("deceased_death_hour", "Người đó mất vào lúc mấy giờ? Nếu không rõ, hãy nói bỏ qua."),
+    InterviewStep("deceased_death_minute", "Người đó mất vào phút thứ bao nhiêu? Nếu không rõ, hãy nói bỏ qua."),
     InterviewStep("deceased_death_place", "Người đó qua đời ở đâu?"),
     InterviewStep("deceased_death_cause", "Nguyên nhân qua đời là gì, nếu bạn biết?"),
     InterviewStep("death_certificate_number", "Số giấy báo tử hoặc giấy tờ thay thế là bao nhiêu, nếu bạn có?"),
     InterviewStep("death_certificate_date", "Giấy báo tử được cấp vào ngày, tháng, năm nào?"),
     InterviewStep("death_certificate_issuer", "Giấy báo tử do cơ quan nào cấp?"),
     *_BANK_ACCOUNT_STEPS,
+    InterviewStep("payment_method", "Bạn muốn nhận hỗ trợ bằng tài khoản ngân hàng hay tiền mặt?", True),
     InterviewStep(
         "org_name",
         "Nếu có cơ quan, tổ chức đứng ra tổ chức mai táng thay vì cá nhân, hãy cho biết tên tổ chức đó. Nếu không, trả lời “bỏ qua”.",
@@ -323,6 +333,45 @@ class InterviewService:
             value = next((label for pattern, label in categories if re.search(pattern, folded)), "")
             if not value:
                 return "", "Vui lòng chọn một trong năm nhóm hỗ trợ vừa được nêu trong câu hỏi."
+        elif field == "payment_method":
+            if "tien mat" in folded:
+                value = "Tiền mặt"
+            elif "tai khoan" in folded or "ngan hang" in folded:
+                value = "Tài khoản ngân hàng"
+            else:
+                return "", "Vui lòng trả lời tài khoản ngân hàng hoặc tiền mặt."
+        elif field in {"deceased_death_hour", "deceased_death_minute"}:
+            value = _spoken_digits(value) or value
+            match = re.search(r"\d{1,2}", value)
+            value = match.group(0) if match else ""
+            maximum = 23 if field.endswith("hour") else 59
+            if not value or int(value) > maximum:
+                return "", f"Vui lòng đọc một số từ 0 đến {maximum}."
+        elif field == "cremation_support_category":
+            categories = (
+                (r"ba me viet nam", "Bà mẹ Việt Nam anh hùng"),
+                (r"anh hung luc luong|anh hung lao dong", "Anh hùng lực lượng vũ trang nhân dân, anh hùng lao động"),
+                (r"huy hieu 40|dang vien", "Đảng viên có Huy hiệu 40 tuổi Đảng trở lên"),
+                (r"truoc.*1945|lao thanh", "Người hoạt động cách mạng trước ngày 01/01/1945"),
+                (r"tien khoi nghia|19.?8.?1945", "Người hoạt động cách mạng từ 01/01/1945 đến trước 19/8/1945"),
+                (r"thuong binh", "Thương binh từ 81% trở lên"),
+                (r"benh binh", "Bệnh binh từ 81% trở lên"),
+                (r"chat doc hoa hoc", "Người hoạt động kháng chiến bị nhiễm chất độc hóa học từ 81% trở lên"),
+                (r"than nhan liet si", "Thân nhân liệt sĩ, người có công đang hưởng trợ cấp nuôi dưỡng"),
+                (r"thi nghe|trung tam duong lao", "Đối tượng chính sách tại Trung tâm dưỡng lão Thị Nghè"),
+                (r"can ngheo", "Hộ cận nghèo"),
+                (r"ho ngheo|ngheo", "Hộ nghèo"),
+                (r"khuyet tat", "Người khuyết tật"),
+                (r"cao tuoi", "Người cao tuổi"),
+                (r"bao tro xa hoi", "Đối tượng bảo trợ xã hội khác"),
+                (r"huu tri", "Đối tượng hưu trí"),
+                (r"tre.*tam tru|kt3", "Trẻ từ 6 tuổi trở xuống có tạm trú KT3 tại TP.HCM"),
+                (r"tre.*ho khau", "Trẻ từ 6 tuổi trở xuống có hộ khẩu tại TP.HCM"),
+                (r"ho khau.*thanh pho|nguoi dan", "Người dân có hộ khẩu tại TP.HCM"),
+            )
+            value = next((label for pattern, label in categories if re.search(pattern, folded)), "")
+            if not value:
+                return "", "Tôi chưa xác định được nhóm đối tượng. Vui lòng nói lại tên nhóm như trên giấy tờ xác nhận."
         elif field == "contact_address" and "giong noi cu tru" in folded:
             value = known_fields.get("residence_address", "")
             if not value:

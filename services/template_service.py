@@ -43,14 +43,14 @@ TEMPLATES = {
         title="Tờ khai nhận chi phí hỗ trợ khuyến khích hỏa táng",
         file_name="ho_tro_hoa_tang.docx",
         download_name="to-khai-ho-tro-khuyen-khich-hoa-tang",
-        required_fields=_DECEASED_BENEFIT_REQUIRED_FIELDS,
+        required_fields=(*_DECEASED_BENEFIT_REQUIRED_FIELDS, "cremation_support_category"),
     ),
     "ho_tro_mai_tang": FormTemplate(
         id="ho_tro_mai_tang",
         title="Tờ khai đề nghị hỗ trợ chi phí mai táng",
         file_name="ho_tro_mai_tang.docx",
         download_name="to-khai-de-nghi-ho-tro-chi-phi-mai-tang",
-        required_fields=_DECEASED_BENEFIT_REQUIRED_FIELDS,
+        required_fields=(*_DECEASED_BENEFIT_REQUIRED_FIELDS, "request_content", "payment_method"),
     ),
     "ho_tro_nq40": FormTemplate(
         id="ho_tro_nq40",

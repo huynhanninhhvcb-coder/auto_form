@@ -529,6 +529,54 @@
             <label class="input-group wide"
               >Nguyên nhân mất<input name="deceased_death_cause"
             /></label>
+            <label class="input-group wide"
+              >Nội dung đề nghị <em>*</em><input name="request_content" required
+            /></label>
+            <label class="input-group"
+              >Giờ mất<input name="deceased_death_hour" type="number" min="0" max="23"
+            /></label>
+            <label class="input-group"
+              >Phút mất<input name="deceased_death_minute" type="number" min="0" max="59"
+            /></label>
+            <label class="input-group wide"
+              >Phương thức nhận hỗ trợ <em>*</em>
+              <select name="payment_method" required>
+                <option value="">-- Chọn phương thức --</option>
+                <option>Tài khoản ngân hàng</option>
+                <option>Tiền mặt</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-grid template-fields" data-template="ho_tro_hoa_tang" hidden>
+            <label class="input-group wide"
+              >Đối tượng nhận hỗ trợ hỏa táng <em>*</em>
+              <select name="cremation_support_category" required>
+                <option value="">-- Chọn đối tượng --</option>
+                <option>Bà mẹ Việt Nam anh hùng</option>
+                <option>Anh hùng lực lượng vũ trang nhân dân, anh hùng lao động</option>
+                <option>Đảng viên có Huy hiệu 40 tuổi Đảng trở lên</option>
+                <option>Người hoạt động cách mạng trước ngày 01/01/1945</option>
+                <option>Người hoạt động cách mạng từ 01/01/1945 đến trước 19/8/1945</option>
+                <option>Thương binh từ 81% trở lên</option>
+                <option>Bệnh binh từ 81% trở lên</option>
+                <option>Người hoạt động kháng chiến bị nhiễm chất độc hóa học từ 81% trở lên</option>
+                <option>Thân nhân liệt sĩ, người có công đang hưởng trợ cấp nuôi dưỡng</option>
+                <option>Đối tượng chính sách tại Trung tâm dưỡng lão Thị Nghè</option>
+                <option>Hộ nghèo</option>
+                <option>Người khuyết tật</option>
+                <option>Người cao tuổi</option>
+                <option>Đối tượng bảo trợ xã hội khác</option>
+                <option>Đối tượng hưu trí</option>
+                <option>Hộ cận nghèo</option>
+                <option>Người dân có hộ khẩu tại TP.HCM</option>
+                <option>Trẻ từ 6 tuổi trở xuống có hộ khẩu tại TP.HCM</option>
+                <option>Trẻ từ 6 tuổi trở xuống có tạm trú KT3 tại TP.HCM</option>
+              </select>
+            </label>
+            <label class="input-group wide"
+              >Mã hộ nghèo/cận nghèo hoặc thông tin cụ thể<input name="cremation_support_detail"
+            /></label>
           </div>
 
           <details

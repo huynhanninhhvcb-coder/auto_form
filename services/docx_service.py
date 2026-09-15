@@ -204,6 +204,29 @@ def generate_document(template: FormTemplate, raw_fields: dict, output_path: str
     fields["death_certificate_date"] = normalize_date(fields.get("death_certificate_date"))
     fields["org_phone"] = normalize_phone(fields.get("org_phone"))
 
+    fields["bank_payment_check"] = "☒" if fields.get("payment_method") == "Tài khoản ngân hàng" else "☐"
+    fields["cash_payment_check"] = "☒" if fields.get("payment_method") == "Tiền mặt" else "☐"
+    cremation_category = fields.get("cremation_support_category", "").casefold()
+    for index in range(1, 20):
+        fields[f"cremation_category_{index}_check"] = "☐"
+    cremation_categories = [
+        "Bà mẹ Việt Nam anh hùng", "Anh hùng lực lượng vũ trang nhân dân, anh hùng lao động",
+        "Đảng viên có Huy hiệu 40 tuổi Đảng trở lên", "Người hoạt động cách mạng trước ngày 01/01/1945",
+        "Người hoạt động cách mạng từ 01/01/1945 đến trước 19/8/1945", "Thương binh từ 81% trở lên",
+        "Bệnh binh từ 81% trở lên", "Người hoạt động kháng chiến bị nhiễm chất độc hóa học từ 81% trở lên",
+        "Thân nhân liệt sĩ, người có công đang hưởng trợ cấp nuôi dưỡng", "Đối tượng chính sách tại Trung tâm dưỡng lão Thị Nghè",
+        "Hộ nghèo", "Người khuyết tật", "Người cao tuổi", "Đối tượng bảo trợ xã hội khác", "Đối tượng hưu trí",
+        "Hộ cận nghèo", "Người dân có hộ khẩu tại TP.HCM", "Trẻ từ 6 tuổi trở xuống có hộ khẩu tại TP.HCM",
+        "Trẻ từ 6 tuổi trở xuống có tạm trú KT3 tại TP.HCM",
+    ]
+    for index, label in enumerate(cremation_categories, 1):
+        if cremation_category == label.casefold():
+            fields[f"cremation_category_{index}_check"] = "☒"
+    fields["cremation_poor_detail"] = fields.get("cremation_support_detail", "") if cremation_category == "hộ nghèo" else ""
+    fields["cremation_near_poor_detail"] = (
+        fields.get("cremation_support_detail", "") if cremation_category == "hộ cận nghèo" else ""
+    )
+
     support_category = fields.get("support_category", "").casefold()
     support_options = {
         "support_two_children_check": "phụ nữ sinh đủ hai con trước 35 tuổi",

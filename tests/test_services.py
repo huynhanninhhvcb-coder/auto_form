@@ -669,6 +669,7 @@ SO CCCD: 079150001234"""
             "residence_address": "Phường Minh Phụng, Thành phố Hồ Chí Minh",
             "deceased_full_name": "TRẦN THỊ BA",
             "deceased_death_date": "ngày mười lăm tháng tám năm hai nghìn không trăm hai mươi sáu",
+            "cremation_support_category": "hộ nghèo",
         }
         for _ in range(25):
             if interview["complete"]:
@@ -694,6 +695,7 @@ SO CCCD: 079150001234"""
         self.assertEqual(interview["fields"]["citizen_id"], "079150001234")
         self.assertEqual(interview["fields"]["deceased_full_name"], "TRẦN THỊ BA")
         self.assertEqual(interview["fields"]["deceased_death_date"], "15/08/2026")
+        self.assertEqual(interview["fields"]["cremation_support_category"], "Hộ nghèo")
         # Mẫu hỏa táng không hỏi các trường riêng của mẫu hưu trí.
         self.assertEqual(interview["fields"]["gender"], "")
         self.assertEqual(interview["fields"]["benefit_receiving_location"], "")
@@ -708,9 +710,11 @@ SO CCCD: 079150001234"""
             "date_of_birth": "ngày hai tháng ba năm một chín sáu không",
             "citizen_id": "không bảy chín một sáu không không không không không một một",
             "residence_address": "Phường Minh Phụng, Thành phố Hồ Chí Minh",
+            "request_content": "Đề nghị hỗ trợ chi phí mai táng",
             "deceased_full_name": "PHẠM VĂN DŨNG",
             "deceased_death_date": "ngày mười tháng chín năm hai nghìn không trăm hai mươi sáu",
             "deceased_gender": "Nam",
+            "payment_method": "tiền mặt",
         }
         for _ in range(35):
             if interview["complete"]:
@@ -729,6 +733,8 @@ SO CCCD: 079150001234"""
         self.assertEqual(interview["fields"]["deceased_full_name"], "PHẠM VĂN DŨNG")
         self.assertEqual(interview["fields"]["deceased_death_date"], "10/09/2026")
         self.assertEqual(interview["fields"]["deceased_gender"], "Nam")
+        self.assertEqual(interview["fields"]["request_content"], "Đề nghị hỗ trợ chi phí mai táng")
+        self.assertEqual(interview["fields"]["payment_method"], "Tiền mặt")
         # Các trường không bắt buộc đã "bỏ qua" phải giữ nguyên rỗng.
         self.assertEqual(interview["fields"]["deceased_citizen_id"], "")
         self.assertEqual(interview["fields"]["org_name"], "")

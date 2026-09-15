@@ -19,12 +19,16 @@ class TemplateServiceTests(unittest.TestCase):
             },
         )
 
-    def test_deceased_benefit_templates_share_the_same_required_fields(self):
+    def test_deceased_benefit_templates_share_a_common_base_plus_their_own_field(self):
         hoa_tang = get_template("ho_tro_hoa_tang")
         mai_tang = get_template("ho_tro_mai_tang")
-        expected = ("full_name", "date_of_birth", "citizen_id", "residence_address", "deceased_full_name", "deceased_death_date")
-        self.assertEqual(hoa_tang.required_fields, expected)
-        self.assertEqual(mai_tang.required_fields, expected)
+        shared_base = ("full_name", "date_of_birth", "citizen_id", "residence_address", "deceased_full_name", "deceased_death_date")
+        self.assertEqual(hoa_tang.required_fields[:6], shared_base)
+        self.assertEqual(mai_tang.required_fields[:6], shared_base)
+        # Hỏa táng cần thêm đối tượng hỏa táng; mai táng cần thêm nội dung đề
+        # nghị và phương thức nhận hỗ trợ - hai mẫu không còn giống hệt nhau.
+        self.assertEqual(hoa_tang.required_fields[6:], ("cremation_support_category",))
+        self.assertEqual(mai_tang.required_fields[6:], ("request_content", "payment_method"))
 
     def test_new_template_word_files_exist_on_disk(self):
         self.assertTrue(get_template("ho_tro_hoa_tang").path.is_file())
