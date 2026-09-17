@@ -678,6 +678,71 @@
             </div>
           </details>
 
+          <div
+            class="form-grid template-fields"
+            data-template="xac_dinh_khuyet_tat"
+            hidden
+          >
+            <label class="input-group"
+              >Giới tính
+              <select name="gender">
+                <option value="">-- Chọn --</option>
+                <option>Nam</option>
+                <option>Nữ</option>
+                <option>Khác</option>
+              </select>
+            </label>
+            <label class="input-group wide"
+              >Nơi ở hiện nay<input name="contact_address"
+            /></label>
+            <label class="input-group wide"
+              >Nội dung đề nghị <em>*</em>
+              <select name="disability_procedure_type" required>
+                <option value="">-- Chọn nội dung đề nghị --</option>
+                <option>Xác định mức độ khuyết tật và cấp Giấy xác nhận khuyết tật</option>
+                <option>Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật</option>
+                <option>Cấp lại Giấy xác nhận khuyết tật</option>
+                <option>Cấp đổi Giấy xác nhận khuyết tật</option>
+              </select>
+            </label>
+          </div>
+
+          <details
+            class="optional-fields template-fields"
+            data-template="xac_dinh_khuyet_tat"
+            hidden
+          >
+            <summary>Thông tin người đại diện hợp pháp (nếu có)</summary>
+            <div class="form-grid details-grid">
+              <label class="input-group wide"
+                >Họ tên người đại diện<input name="guardian_full_name"
+              /></label>
+              <label class="input-group"
+                >Mối quan hệ với người được xác định khuyết tật<input
+                  name="guardian_relationship"
+              /></label>
+              <label class="input-group"
+                >Số CMND/CCCD người đại diện<input
+                  name="guardian_citizen_id"
+                  inputmode="numeric"
+                  maxlength="12"
+              /></label>
+              <label class="input-group wide"
+                >Hộ khẩu thường trú người đại diện<input
+                  name="guardian_residence_address"
+              /></label>
+              <label class="input-group wide"
+                >Nơi ở hiện nay người đại diện<input
+                  name="guardian_current_address"
+              /></label>
+              <label class="input-group"
+                >Số điện thoại người đại diện<input
+                  name="guardian_phone"
+                  inputmode="tel"
+              /></label>
+            </div>
+          </details>
+
           <div class="generate-row">
             <div>
               <strong>BƯỚC 3 — Tạo tệp biểu mẫu</strong

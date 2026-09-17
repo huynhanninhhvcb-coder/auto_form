@@ -91,6 +91,16 @@ def validate_form_data(data: dict, required_fields: tuple[str, ...] | list[str])
     if payment_method and payment_method not in {"Tài khoản ngân hàng", "Tiền mặt"}:
         errors["payment_method"] = "Vui lòng chọn nhận qua tài khoản ngân hàng hoặc tiền mặt."
 
+    disability_procedure_type = clean_data.get("disability_procedure_type", "")
+    allowed_disability_procedure_types = {
+        "Xác định mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+        "Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+        "Cấp lại Giấy xác nhận khuyết tật",
+        "Cấp đổi Giấy xác nhận khuyết tật",
+    }
+    if disability_procedure_type and disability_procedure_type not in allowed_disability_procedure_types:
+        errors["disability_procedure_type"] = "Vui lòng chọn đúng một nội dung đề nghị trong danh sách."
+
     for time_field, maximum in (("deceased_death_hour", 23), ("deceased_death_minute", 59)):
         value = clean_data.get(time_field, "")
         if value and (not value.isdigit() or not 0 <= int(value) <= maximum):

@@ -82,6 +82,22 @@ TEMPLATES = {
             "support_category",
         ),
     ),
+    "xac_dinh_khuyet_tat": FormTemplate(
+        id="xac_dinh_khuyet_tat",
+        title=(
+            "Đơn đề nghị xác định, xác định lại mức độ khuyết tật và cấp, "
+            "cấp đổi, cấp lại Giấy xác nhận khuyết tật"
+        ),
+        file_name="xac_dinh_khuyet_tat.docx",
+        download_name="don-xac-dinh-muc-do-khuyet-tat",
+        required_fields=(
+            "full_name",
+            "date_of_birth",
+            "citizen_id",
+            "residence_address",
+            "disability_procedure_type",
+        ),
+    ),
 }
 
 

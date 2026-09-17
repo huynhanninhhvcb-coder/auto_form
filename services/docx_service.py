@@ -227,6 +227,16 @@ def generate_document(template: FormTemplate, raw_fields: dict, output_path: str
         fields.get("cremation_support_detail", "") if cremation_category == "hộ cận nghèo" else ""
     )
 
+    disability_procedure_type = fields.get("disability_procedure_type", "").casefold()
+    disability_procedure_options = {
+        "disability_procedure_new_check": "Xác định mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+        "disability_procedure_redetermine_check": "Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+        "disability_procedure_reissue_check": "Cấp lại Giấy xác nhận khuyết tật",
+        "disability_procedure_replace_check": "Cấp đổi Giấy xác nhận khuyết tật",
+    }
+    for token, label in disability_procedure_options.items():
+        fields[token] = "☒" if disability_procedure_type == label.casefold() else "☐"
+
     support_category = fields.get("support_category", "").casefold()
     support_options = {
         "support_two_children_check": "phụ nữ sinh đủ hai con trước 35 tuổi",

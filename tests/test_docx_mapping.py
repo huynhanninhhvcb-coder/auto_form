@@ -234,5 +234,64 @@ class NqSupportDocxMappingTests(unittest.TestCase):
             self.assertNotIn("{{", text)
 
 
+class DisabilityDeterminationDocxMappingTests(unittest.TestCase):
+    def _generate(self, fields: dict) -> str:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "filled.docx"
+            generate_document(get_template("xac_dinh_khuyet_tat"), fields, output)
+            return _full_text(Document(output))
+
+    def test_checks_exactly_the_selected_procedure_and_fills_identity_fields(self):
+        text = self._generate(
+            {
+                "full_name": "NGUYỄN VĂN AN",
+                "date_of_birth": "1-2-2015",
+                "gender": "Nam",
+                "citizen_id": "079 215 001 234",
+                "residence_address": "123 Lý Nam Đế, Phường Minh Phụng",
+                "contact_address": "123 Lý Nam Đế, Phường Minh Phụng",
+                "disability_procedure_type": "Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+            }
+        )
+        self.assertNotIn("{{", text)
+        self.assertIn("NGUYỄN VĂN AN", text)
+        self.assertIn("079215001234", text)
+        redetermine_line = _line_containing(text, "Xác định lại mức độ khuyết tật")
+        self.assertIn("☒", redetermine_line)
+        new_line = _line_containing(text, "Xác định mức độ khuyết tật và cấp")
+        self.assertIn("☐", new_line)
+        self.assertEqual(text.count("☒"), 1)
+        self.assertEqual(text.count("☐"), 3)
+
+    def test_leaves_legal_representative_section_blank_when_not_provided(self):
+        text = self._generate(
+            {
+                "full_name": "NGUYỄN VĂN AN",
+                "date_of_birth": "01/02/2015",
+                "citizen_id": "079215001234",
+                "residence_address": "123 Lý Nam Đế",
+                "disability_procedure_type": "Cấp lại Giấy xác nhận khuyết tật",
+            }
+        )
+        self.assertNotIn("{{", text)
+        representative_line = _line_containing(text, "Mối quan hệ với người được xác định khuyết tật")
+        self.assertTrue(representative_line.strip().endswith(":"))
+
+    def test_disability_type_and_ability_level_tables_stay_blank_for_hand_completion(self):
+        text = self._generate(
+            {
+                "full_name": "NGUYỄN VĂN AN",
+                "date_of_birth": "01/02/2015",
+                "citizen_id": "079215001234",
+                "residence_address": "123 Lý Nam Đế",
+                "disability_procedure_type": "Cấp lại Giấy xác nhận khuyết tật",
+            }
+        )
+        self.assertIn("Khuyết tật vận động", text)
+        self.assertIn("Đi lại", text)
+        # Mục III để trống cho Hội đồng xác định khuyết tật đánh dấu tay.
+        self.assertNotIn("☒", _line_containing(text, "Khuyết tật vận động"))
+
+
 if __name__ == "__main__":
     unittest.main()

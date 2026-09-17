@@ -77,6 +77,12 @@ FIELD_NAMES = {
     "org_representative_name": "Người đại diện tổ chức",
     "org_representative_title": "Chức vụ người đại diện",
     "org_phone": "Số điện thoại tổ chức",
+    # Đơn xác định mức độ khuyết tật: nội dung đề nghị và địa chỉ riêng của
+    # người đại diện hợp pháp không nằm trên giấy tờ của người được xác định
+    # khuyết tật, nên luôn cần nhập tay giống các trường guardian_* khác.
+    "disability_procedure_type": "Loại đề nghị",
+    "guardian_residence_address": "Hộ khẩu thường trú người đại diện",
+    "guardian_current_address": "Nơi ở hiện nay người đại diện",
 }
 
 

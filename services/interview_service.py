@@ -146,12 +146,54 @@ _HO_TRO_NGHI_QUYET_STEPS: tuple[InterviewStep, ...] = (
     ),
 )
 
+_XAC_DINH_KHUYET_TAT_STEPS: tuple[InterviewStep, ...] = (
+    InterviewStep(
+        "full_name",
+        "Vui lòng cho biết họ và tên đầy đủ của người được xác định mức độ khuyết tật, đúng như trên CCCD hoặc giấy khai sinh.",
+        True,
+    ),
+    InterviewStep("date_of_birth", "Ngày, tháng, năm sinh của người đó là gì? Ví dụ: 30/05/2015.", True),
+    InterviewStep("gender", "Giới tính của người đó là Nam, Nữ hay Khác?"),
+    InterviewStep(
+        "citizen_id",
+        "Vui lòng đọc từng chữ số CMND hoặc số định danh cá nhân/CCCD của người đó, gồm 12 số. Ví dụ: không, bảy, chín…",
+        True,
+    ),
+    InterviewStep(
+        "residence_address",
+        "Hộ khẩu thường trú của người được xác định khuyết tật ở đâu? Vui lòng nêu đầy đủ số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố.",
+        True,
+    ),
+    InterviewStep(
+        "contact_address",
+        "Nơi ở hiện nay của người đó có giống hộ khẩu thường trú không? Nếu giống, trả lời “giống nơi cư trú”; nếu khác, hãy nêu địa chỉ hiện tại.",
+    ),
+    InterviewStep(
+        "disability_procedure_type",
+        "Bạn đề nghị nội dung nào: xác định mức độ khuyết tật, xác định lại mức độ khuyết tật, cấp lại Giấy xác nhận khuyết tật, hay cấp đổi Giấy xác nhận khuyết tật?",
+        True,
+    ),
+    InterviewStep(
+        "guardian_full_name",
+        "Nếu người được xác định khuyết tật có người đại diện hợp pháp (cha, mẹ, người giám hộ...), hãy cho biết họ và tên người đó. Nếu không có, trả lời “bỏ qua”.",
+    ),
+    InterviewStep("guardian_relationship", "Người đại diện đó có quan hệ gì với người được xác định khuyết tật?"),
+    InterviewStep("guardian_citizen_id", "Số CMND hoặc CCCD của người đại diện là gì? Vui lòng đọc từng chữ số, gồm 12 số."),
+    InterviewStep("guardian_residence_address", "Hộ khẩu thường trú của người đại diện ở đâu?"),
+    InterviewStep(
+        "guardian_current_address",
+        "Nơi ở hiện nay của người đại diện có giống hộ khẩu thường trú không? Nếu giống, trả lời “giống nơi cư trú”; nếu khác, hãy nêu địa chỉ hiện tại.",
+    ),
+    InterviewStep("guardian_phone", "Số điện thoại của người đại diện là gì? Vui lòng đọc từng chữ số."),
+)
+
 TEMPLATE_STEPS: dict[str, tuple[InterviewStep, ...]] = {
     "tro_cap_huu_tri": _TRO_CAP_HUU_TRI_STEPS,
     "ho_tro_hoa_tang": _HO_TRO_HOA_TANG_STEPS,
     "ho_tro_mai_tang": _HO_TRO_MAI_TANG_STEPS,
     "ho_tro_nq40": _HO_TRO_NGHI_QUYET_STEPS,
     "ho_tro_nq32": _HO_TRO_NGHI_QUYET_STEPS,
+    "xac_dinh_khuyet_tat": _XAC_DINH_KHUYET_TAT_STEPS,
 }
 
 SKIP_ANSWERS = {"bo qua", "khong co", "khong nho", "khong ap dung", "skip"}
@@ -372,10 +414,21 @@ class InterviewService:
             value = next((label for pattern, label in categories if re.search(pattern, folded)), "")
             if not value:
                 return "", "Tôi chưa xác định được nhóm đối tượng. Vui lòng nói lại tên nhóm như trên giấy tờ xác nhận."
-        elif field == "contact_address" and "giong noi cu tru" in folded:
-            value = known_fields.get("residence_address", "")
+        elif field in {"contact_address", "guardian_current_address"} and "giong noi cu tru" in folded:
+            source_field = "guardian_residence_address" if field == "guardian_current_address" else "residence_address"
+            value = known_fields.get(source_field, "")
             if not value:
-                return "", "Tôi chưa có địa chỉ nơi cư trú. Vui lòng cung cấp địa chỉ liên lạc cụ thể."
+                return "", "Tôi chưa có địa chỉ thường trú tương ứng. Vui lòng cung cấp địa chỉ cụ thể."
+        elif field == "disability_procedure_type":
+            categories = (
+                (r"cap\s*doi", "Cấp đổi Giấy xác nhận khuyết tật"),
+                (r"cap\s*lai", "Cấp lại Giấy xác nhận khuyết tật"),
+                (r"xac\s*dinh\s*lai", "Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật"),
+                (r"xac\s*dinh", "Xác định mức độ khuyết tật và cấp Giấy xác nhận khuyết tật"),
+            )
+            value = next((label for pattern, label in categories if re.search(pattern, folded)), "")
+            if not value:
+                return "", "Vui lòng chọn một trong bốn nội dung: xác định, xác định lại, cấp lại hoặc cấp đổi Giấy xác nhận khuyết tật."
         elif field in {"full_name", "deceased_full_name"} and len(re.sub(r"[^A-Za-zÀ-ỹĐđ]", "", value)) < 4:
             return "", "Họ và tên có vẻ chưa đầy đủ. Vui lòng cho biết đầy đủ họ, chữ đệm và tên."
         return value, None

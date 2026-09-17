@@ -9,7 +9,7 @@ from services.template_service import get_template, list_templates
 
 
 class TemplateServiceTests(unittest.TestCase):
-    def test_lists_all_five_templates(self):
+    def test_lists_all_six_templates(self):
         ids = {item["id"] for item in list_templates()}
         self.assertEqual(
             ids,
@@ -19,6 +19,7 @@ class TemplateServiceTests(unittest.TestCase):
                 "ho_tro_mai_tang",
                 "ho_tro_nq40",
                 "ho_tro_nq32",
+                "xac_dinh_khuyet_tat",
             },
         )
 
@@ -38,6 +39,14 @@ class TemplateServiceTests(unittest.TestCase):
         self.assertTrue(get_template("ho_tro_mai_tang").path.is_file())
         self.assertTrue(get_template("ho_tro_nq40").path.is_file())
         self.assertTrue(get_template("ho_tro_nq32").path.is_file())
+        self.assertTrue(get_template("xac_dinh_khuyet_tat").path.is_file())
+
+    def test_disability_determination_template_requires_procedure_type(self):
+        template = get_template("xac_dinh_khuyet_tat")
+        self.assertEqual(
+            template.required_fields,
+            ("full_name", "date_of_birth", "citizen_id", "residence_address", "disability_procedure_type"),
+        )
 
     def test_nq_templates_require_identity_issue_and_support_group(self):
         expected = (

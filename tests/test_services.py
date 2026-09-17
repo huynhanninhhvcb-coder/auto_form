@@ -697,6 +697,48 @@ SO CCCD: 079150001234"""
                 self.assertEqual(interview["fields"]["citizen_id_issue_date"], "03/04/2021")
                 self.assertEqual(interview["fields"]["support_category"], "Hộ cận nghèo")
 
+    def test_disability_determination_interview_normalizes_procedure_type_and_representative_address(self):
+        client = self.app.test_client()
+        interview = client.post(
+            "/api/interview/start", json={"template_id": "xac_dinh_khuyet_tat"}
+        ).get_json()
+        answers = {
+            "full_name": "NGUYỄN VĂN AN",
+            "date_of_birth": "ngày một tháng hai năm hai không một năm",
+            "gender": "nam",
+            "citizen_id": "không bảy chín hai một năm không không một hai ba bốn",
+            "residence_address": "123 Lý Nam Đế, Phường Minh Phụng",
+            "contact_address": "giống nơi cư trú",
+            "disability_procedure_type": "Tôi muốn xác định lại mức độ khuyết tật",
+            "guardian_full_name": "NGUYỄN VĂN BA",
+            "guardian_relationship": "Cha",
+            "guardian_citizen_id": "không bảy tám một hai ba bốn năm sáu bảy tám chín",
+            "guardian_residence_address": "123 Lý Nam Đế",
+            "guardian_current_address": "giống nơi cư trú",
+            "guardian_phone": "không chín một hai ba bốn năm sáu bảy tám",
+        }
+        for _ in range(20):
+            if interview["complete"]:
+                break
+            field = interview["field"]
+            response = client.post(
+                "/api/interview/answer",
+                json={"session_id": interview["session_id"], "answer": answers.get(field, "bỏ qua")},
+            )
+            self.assertEqual(response.status_code, 200)
+            interview = response.get_json()
+            self.assertIsNone(interview["error"])
+        self.assertTrue(interview["complete"])
+        fields = interview["fields"]
+        self.assertEqual(fields["citizen_id"], "079215001234")
+        self.assertEqual(
+            fields["disability_procedure_type"],
+            "Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật",
+        )
+        self.assertEqual(fields["contact_address"], fields["residence_address"])
+        self.assertEqual(fields["guardian_current_address"], fields["guardian_residence_address"])
+        self.assertEqual(fields["guardian_phone"], "0912345678")
+
     def test_hoa_tang_interview_asks_about_deceased_instead_of_retirement_fields(self):
         client = self.app.test_client()
         response = client.post("/api/interview/start", json={"template_id": "ho_tro_hoa_tang"})
