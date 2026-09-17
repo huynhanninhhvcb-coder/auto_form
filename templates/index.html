@@ -384,7 +384,7 @@
 
           <div
             class="form-grid template-fields"
-            data-template="tro_cap_huu_tri"
+            data-template="tro_cap_huu_tri xac_dinh_khuyet_tat"
           >
             <label class="input-group"
               >Giới tính
@@ -395,11 +395,17 @@
                 <option>Khác</option>
               </select>
             </label>
+            <label class="input-group wide"
+              >Địa chỉ liên lạc / Nơi ở hiện nay<input name="contact_address"
+            /></label>
+          </div>
+
+          <div
+            class="form-grid template-fields"
+            data-template="tro_cap_huu_tri"
+          >
             <label class="input-group"
               >Dân tộc<input name="ethnic_group"
-            /></label>
-            <label class="input-group wide"
-              >Địa chỉ liên lạc<input name="contact_address"
             /></label>
             <label class="input-group"
               >Nơi đề nghị nhận trợ cấp<input name="benefit_receiving_location"
@@ -645,35 +651,55 @@
 
           <details
             class="optional-fields template-fields"
-            data-template="tro_cap_huu_tri"
+            data-template="tro_cap_huu_tri xac_dinh_khuyet_tat"
           >
-            <summary>Thông tin người giám hộ/ủy quyền (nếu có)</summary>
+            <summary>Thông tin người giám hộ/đại diện hợp pháp (nếu có)</summary>
             <div class="form-grid details-grid">
               <label class="input-group wide"
-                >Họ tên người giám hộ/ủy quyền<input name="guardian_full_name"
+                >Họ tên người giám hộ/đại diện<input name="guardian_full_name"
               /></label>
               <label class="input-group"
-                >Ngày sinh người giám hộ<input
-                  name="guardian_date_of_birth"
-                  placeholder="dd/mm/yyyy"
-                  inputmode="numeric"
-              /></label>
-              <label class="input-group"
-                >CCCD người giám hộ<input
+                >CCCD/số định danh người giám hộ/đại diện<input
                   name="guardian_citizen_id"
                   inputmode="numeric"
                   maxlength="12"
               /></label>
-              <label class="input-group wide"
-                >Địa chỉ người giám hộ<input name="guardian_address"
-              /></label>
               <label class="input-group"
-                >Số điện thoại người giám hộ<input
+                >Số điện thoại người giám hộ/đại diện<input
                   name="guardian_phone"
                   inputmode="tel"
               /></label>
               <label class="input-group"
                 >Quan hệ với người đề nghị<input name="guardian_relationship"
+              /></label>
+              <label
+                class="input-group template-fields"
+                data-template="tro_cap_huu_tri"
+                ><span>Ngày sinh người giám hộ</span
+                ><input
+                  name="guardian_date_of_birth"
+                  placeholder="dd/mm/yyyy"
+                  inputmode="numeric"
+              /></label>
+              <label
+                class="input-group wide template-fields"
+                data-template="tro_cap_huu_tri"
+                ><span>Địa chỉ người giám hộ</span
+                ><input name="guardian_address"
+              /></label>
+              <label
+                class="input-group wide template-fields"
+                data-template="xac_dinh_khuyet_tat"
+                hidden
+                ><span>Hộ khẩu thường trú người đại diện</span
+                ><input name="guardian_residence_address"
+              /></label>
+              <label
+                class="input-group wide template-fields"
+                data-template="xac_dinh_khuyet_tat"
+                hidden
+                ><span>Nơi ở hiện nay người đại diện</span
+                ><input name="guardian_current_address"
               /></label>
             </div>
           </details>
@@ -683,18 +709,6 @@
             data-template="xac_dinh_khuyet_tat"
             hidden
           >
-            <label class="input-group"
-              >Giới tính
-              <select name="gender">
-                <option value="">-- Chọn --</option>
-                <option>Nam</option>
-                <option>Nữ</option>
-                <option>Khác</option>
-              </select>
-            </label>
-            <label class="input-group wide"
-              >Nơi ở hiện nay<input name="contact_address"
-            /></label>
             <label class="input-group wide"
               >Nội dung đề nghị <em>*</em>
               <select name="disability_procedure_type" required>
@@ -706,42 +720,6 @@
               </select>
             </label>
           </div>
-
-          <details
-            class="optional-fields template-fields"
-            data-template="xac_dinh_khuyet_tat"
-            hidden
-          >
-            <summary>Thông tin người đại diện hợp pháp (nếu có)</summary>
-            <div class="form-grid details-grid">
-              <label class="input-group wide"
-                >Họ tên người đại diện<input name="guardian_full_name"
-              /></label>
-              <label class="input-group"
-                >Mối quan hệ với người được xác định khuyết tật<input
-                  name="guardian_relationship"
-              /></label>
-              <label class="input-group"
-                >Số CMND/CCCD người đại diện<input
-                  name="guardian_citizen_id"
-                  inputmode="numeric"
-                  maxlength="12"
-              /></label>
-              <label class="input-group wide"
-                >Hộ khẩu thường trú người đại diện<input
-                  name="guardian_residence_address"
-              /></label>
-              <label class="input-group wide"
-                >Nơi ở hiện nay người đại diện<input
-                  name="guardian_current_address"
-              /></label>
-              <label class="input-group"
-                >Số điện thoại người đại diện<input
-                  name="guardian_phone"
-                  inputmode="tel"
-              /></label>
-            </div>
-          </details>
 
           <div class="generate-row">
             <div>
