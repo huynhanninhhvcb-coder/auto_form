@@ -6,7 +6,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
@@ -41,10 +41,15 @@ def _centered(document: Document, text: str, *, size: float = 12, bold: bool = F
 
 def _field_line(document: Document, number: int, label: str, token: str, *, dots: int = 52) -> None:
     paragraph = document.add_paragraph()
-    _format_paragraph(paragraph, after=6)
+    _format_paragraph(paragraph, after=8)
+    paragraph.paragraph_format.tab_stops.add_tab_stop(
+        Cm(17.25), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS
+    )
     _set_font(paragraph.add_run(f"{number}. {label}: "))
     _set_font(paragraph.add_run(f"{{{{{token}}}}}"), bold=True)
-    _set_font(paragraph.add_run(" " + "." * dots))
+    # Tab leader tự kéo dài đến đúng lề phải và vẫn hoạt động khi giá trị dài
+    # xuống dòng; chuỗi dấu chấm cố định trước đây chỉ dài khoảng nửa trang.
+    _set_font(paragraph.add_run("\t"))
 
 
 def _remove_table_borders(table) -> None:
@@ -62,8 +67,8 @@ def build_template(resolution_line: str, filename: str) -> Path:
     section = document.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(1.45)
-    section.bottom_margin = Cm(1.35)
+    section.top_margin = Cm(2.0)
+    section.bottom_margin = Cm(1.5)
     section.left_margin = Cm(1.75)
     section.right_margin = Cm(1.75)
 
@@ -91,7 +96,7 @@ def build_template(resolution_line: str, filename: str) -> Path:
     _field_line(document, 2, "Ngày, tháng, năm sinh", "date_of_birth")
 
     identity = document.add_paragraph()
-    _format_paragraph(identity, after=6)
+    _format_paragraph(identity, after=8)
     _set_font(identity.add_run("3. CCCD số: "))
     _set_font(identity.add_run("{{citizen_id}}"), bold=True)
     _set_font(identity.add_run(", Ngày cấp: "))
@@ -125,10 +130,14 @@ def build_template(resolution_line: str, filename: str) -> Path:
     for index, (text, check_token) in enumerate(options):
         paragraph = document.add_paragraph()
         paragraph.paragraph_format.left_indent = Cm(1.45 if index < 2 else 2.2)
-        _format_paragraph(paragraph, after=2)
+        if check_token:
+            paragraph.paragraph_format.tab_stops.add_tab_stop(
+                Cm(15.75 if index < 2 else 15.0), WD_TAB_ALIGNMENT.RIGHT
+            )
+        _format_paragraph(paragraph, after=3)
         _set_font(paragraph.add_run(text))
         if check_token:
-            _set_font(paragraph.add_run(f"  {{{{{check_token}}}}}"), size=13)
+            _set_font(paragraph.add_run(f"\t{{{{{check_token}}}}}"), size=13)
 
     declaration = document.add_paragraph()
     declaration.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -156,11 +165,9 @@ def build_template(resolution_line: str, filename: str) -> Path:
     right.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
     paragraphs = right.paragraphs
     signature_lines = (
-        ("Ngày {{declaration_day}} tháng {{declaration_month}} năm {{declaration_year}}", False, True),
+        ("Ngày..... tháng.... năm 20.....", False, True),
         ("Người khai", True, False),
         ("(ký và ghi rõ họ, tên)", False, True),
-        ("", False, False),
-        ("{{full_name}}", True, False),
     )
     for index, (text, bold, italic) in enumerate(signature_lines):
         paragraph = paragraphs[0] if index == 0 else right.add_paragraph()

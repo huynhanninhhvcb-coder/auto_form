@@ -307,6 +307,12 @@ def _restore_name_from_compact_cccd(page_texts: Iterable[str], selected_name: st
 
 def _clean_address(value: str) -> str:
     folded_value = _fold(value)
+    # Phiếu dân cư có thể đặt nhãn "Nơi đăng ký khai sinh" ngay sau địa chỉ
+    # thường trú. Nếu OCR gộp hai dòng, phần nhãn này không được đi vào đơn.
+    next_field = re.search(r"\s+noi\s+dang\s+ky\s+khai\s+sinh\s*:", folded_value, re.IGNORECASE)
+    if next_field:
+        value = value[: next_field.start()]
+        folded_value = folded_value[: next_field.start()]
     trailing_document_text = re.search(
         r"\s+(?:[il|]\s+)?tp\.?\s+ho\s+chi\s+minh\s*,?\s*ngay",
         folded_value,

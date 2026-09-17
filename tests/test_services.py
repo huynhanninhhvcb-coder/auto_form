@@ -181,6 +181,18 @@ Nơi ở hiện tại: 172/26 Tạ Uyên, Khu phố 14, Phường Minh Phụng, 
         self.assertIn("Tạ Uyên", result.fields["contact_address"])
         self.assertNotIn("Nguyễn Trãi", result.fields["contact_address"])
 
+    def test_residence_stops_before_birth_registration_label(self):
+        result = extract_personal_information(
+            """Họ và tên: LƯU HẢO
+Số định danh: 079148000149
+Ngày sinh: 17/02/1948
+Địa chỉ thường trú: 47/58/5 đường Lạc Long Quân, Phường Minh Phụng, Thành phố Hồ Chí Minh
+Nơi đăng ký khai sinh: Thành phố Hồ Chí Minh, Việt Nam
+Số điện thoại: 0900000000"""
+        )
+        self.assertIn("Lạc Long Quân", result.fields["residence_address"])
+        self.assertNotIn("đăng ký khai sinh", result.fields["residence_address"].casefold())
+
     def test_accepts_common_ocr_misspelling_of_gender_label(self):
         result = extract_personal_information(
             "Gidi tinh: Nam\nSố định danh cá nhân: 079044004914"

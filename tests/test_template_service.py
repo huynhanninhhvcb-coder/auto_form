@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from zipfile import ZipFile
+
+from docx import Document
 
 from services.template_service import get_template, list_templates
 
@@ -48,6 +51,21 @@ class TemplateServiceTests(unittest.TestCase):
         )
         self.assertEqual(get_template("ho_tro_nq40").required_fields, expected)
         self.assertEqual(get_template("ho_tro_nq32").required_fields, expected)
+
+    def test_nq_templates_keep_official_blank_signature_and_full_width_dot_leaders(self):
+        for template_id in ("ho_tro_nq40", "ho_tro_nq32"):
+            template = get_template(template_id)
+            document = Document(template.path)
+            text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+            table_text = "\n".join(
+                cell.text for table in document.tables for row in table.rows for cell in row.cells
+            )
+            with ZipFile(template.path) as archive:
+                xml = archive.read("word/document.xml")
+            with self.subTest(template_id=template_id):
+                self.assertEqual(text.count("{{full_name}}"), 1)
+                self.assertIn("Ngày..... tháng.... năm 20.....", table_text)
+                self.assertGreaterEqual(xml.count(b'w:leader="dot"'), 7)
 
     def test_unknown_template_returns_none(self):
         self.assertIsNone(get_template("khong-ton-tai"))
