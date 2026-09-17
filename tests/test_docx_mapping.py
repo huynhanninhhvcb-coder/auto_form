@@ -183,6 +183,7 @@ class DeceasedBenefitDocxMappingTests(unittest.TestCase):
                 "deceased_death_date": "02/03/2025",
                 "deceased_death_hour": "14",
                 "deceased_death_minute": "5",
+                "gender": "Nam",
                 "payment_method": "Tiền mặt",
                 "request_content": "Đề nghị hỗ trợ chi phí mai táng",
             },
@@ -194,6 +195,8 @@ class DeceasedBenefitDocxMappingTests(unittest.TestCase):
         self.assertTrue(bank_line.startswith("☐"))
         self.assertIn("14 giờ 5 phút", text)
         self.assertIn("Đề nghị hỗ trợ chi phí mai táng", text)
+        self.assertLess(text.index("Nội dung đề nghị"), text.index("2. Thông tin người chết"))
+        self.assertIn("Nam/Nữ: Nam", text)
 
 
 class NqSupportDocxMappingTests(unittest.TestCase):
