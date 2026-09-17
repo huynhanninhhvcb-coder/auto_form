@@ -80,9 +80,7 @@
         </div>
 
         <div class="template-select-row">
-          <label class="field-label" for="template-id"
-            >Biểu mẫu cần điền</label
-          >
+          <label class="field-label" for="template-id">Biểu mẫu cần điền</label>
           <select id="template-id" name="template_id">
             {% for template in templates %}
             <option value="{{ template.id }}">{{ template.title }}</option>
@@ -384,7 +382,7 @@
 
           <div
             class="form-grid template-fields"
-            data-template="tro_cap_huu_tri xac_dinh_khuyet_tat"
+            data-template="tro_cap_huu_tri"
           >
             <label class="input-group"
               >Giới tính
@@ -395,17 +393,11 @@
                 <option>Khác</option>
               </select>
             </label>
-            <label class="input-group wide"
-              >Địa chỉ liên lạc / Nơi ở hiện nay<input name="contact_address"
-            /></label>
-          </div>
-
-          <div
-            class="form-grid template-fields"
-            data-template="tro_cap_huu_tri"
-          >
             <label class="input-group"
               >Dân tộc<input name="ethnic_group"
+            /></label>
+            <label class="input-group wide"
+              >Địa chỉ liên lạc<input name="contact_address"
             /></label>
             <label class="input-group"
               >Nơi đề nghị nhận trợ cấp<input name="benefit_receiving_location"
@@ -426,7 +418,8 @@
                 required
             /></label>
             <label class="input-group"
-              >Nơi cấp CCCD <em>*</em><input name="citizen_id_issue_place" required
+              >Nơi cấp CCCD <em>*</em
+              ><input name="citizen_id_issue_place" required
             /></label>
             <label class="input-group wide"
               >Nơi tạm trú (nếu có)<input name="temporary_address"
@@ -536,13 +529,22 @@
               >Nguyên nhân mất<input name="deceased_death_cause"
             /></label>
             <label class="input-group wide"
-              >Nội dung đề nghị <em>*</em><input name="request_content" required
+              >Nội dung đề nghị <em>*</em
+              ><input name="request_content" required
             /></label>
             <label class="input-group"
-              >Giờ mất<input name="deceased_death_hour" type="number" min="0" max="23"
+              >Giờ mất<input
+                name="deceased_death_hour"
+                type="number"
+                min="0"
+                max="23"
             /></label>
             <label class="input-group"
-              >Phút mất<input name="deceased_death_minute" type="number" min="0" max="59"
+              >Phút mất<input
+                name="deceased_death_minute"
+                type="number"
+                min="0"
+                max="59"
             /></label>
             <label class="input-group wide"
               >Phương thức nhận hỗ trợ <em>*</em>
@@ -554,21 +556,36 @@
             </label>
           </div>
 
-          <div class="form-grid template-fields" data-template="ho_tro_hoa_tang" hidden>
+          <div
+            class="form-grid template-fields"
+            data-template="ho_tro_hoa_tang"
+            hidden
+          >
             <label class="input-group wide"
               >Đối tượng nhận hỗ trợ hỏa táng <em>*</em>
               <select name="cremation_support_category" required>
                 <option value="">-- Chọn đối tượng --</option>
                 <option>Bà mẹ Việt Nam anh hùng</option>
-                <option>Anh hùng lực lượng vũ trang nhân dân, anh hùng lao động</option>
+                <option>
+                  Anh hùng lực lượng vũ trang nhân dân, anh hùng lao động
+                </option>
                 <option>Đảng viên có Huy hiệu 40 tuổi Đảng trở lên</option>
                 <option>Người hoạt động cách mạng trước ngày 01/01/1945</option>
-                <option>Người hoạt động cách mạng từ 01/01/1945 đến trước 19/8/1945</option>
+                <option>
+                  Người hoạt động cách mạng từ 01/01/1945 đến trước 19/8/1945
+                </option>
                 <option>Thương binh từ 81% trở lên</option>
                 <option>Bệnh binh từ 81% trở lên</option>
-                <option>Người hoạt động kháng chiến bị nhiễm chất độc hóa học từ 81% trở lên</option>
-                <option>Thân nhân liệt sĩ, người có công đang hưởng trợ cấp nuôi dưỡng</option>
-                <option>Đối tượng chính sách tại Trung tâm dưỡng lão Thị Nghè</option>
+                <option>
+                  Người hoạt động kháng chiến bị nhiễm chất độc hóa học từ 81%
+                  trở lên
+                </option>
+                <option>
+                  Thân nhân liệt sĩ, người có công đang hưởng trợ cấp nuôi dưỡng
+                </option>
+                <option>
+                  Đối tượng chính sách tại Trung tâm dưỡng lão Thị Nghè
+                </option>
                 <option>Hộ nghèo</option>
                 <option>Người khuyết tật</option>
                 <option>Người cao tuổi</option>
@@ -577,11 +594,14 @@
                 <option>Hộ cận nghèo</option>
                 <option>Người dân có hộ khẩu tại TP.HCM</option>
                 <option>Trẻ từ 6 tuổi trở xuống có hộ khẩu tại TP.HCM</option>
-                <option>Trẻ từ 6 tuổi trở xuống có tạm trú KT3 tại TP.HCM</option>
+                <option>
+                  Trẻ từ 6 tuổi trở xuống có tạm trú KT3 tại TP.HCM
+                </option>
               </select>
             </label>
             <label class="input-group wide"
-              >Mã hộ nghèo/cận nghèo hoặc thông tin cụ thể<input name="cremation_support_detail"
+              >Mã hộ nghèo/cận nghèo hoặc thông tin cụ thể<input
+                name="cremation_support_detail"
             /></label>
           </div>
 
@@ -651,75 +671,38 @@
 
           <details
             class="optional-fields template-fields"
-            data-template="tro_cap_huu_tri xac_dinh_khuyet_tat"
+            data-template="tro_cap_huu_tri"
           >
-            <summary>Thông tin người giám hộ/đại diện hợp pháp (nếu có)</summary>
+            <summary>Thông tin người giám hộ/ủy quyền (nếu có)</summary>
             <div class="form-grid details-grid">
               <label class="input-group wide"
-                >Họ tên người giám hộ/đại diện<input name="guardian_full_name"
+                >Họ tên người giám hộ/ủy quyền<input name="guardian_full_name"
               /></label>
               <label class="input-group"
-                >CCCD/số định danh người giám hộ/đại diện<input
+                >Ngày sinh người giám hộ<input
+                  name="guardian_date_of_birth"
+                  placeholder="dd/mm/yyyy"
+                  inputmode="numeric"
+              /></label>
+              <label class="input-group"
+                >CCCD người giám hộ<input
                   name="guardian_citizen_id"
                   inputmode="numeric"
                   maxlength="12"
               /></label>
+              <label class="input-group wide"
+                >Địa chỉ người giám hộ<input name="guardian_address"
+              /></label>
               <label class="input-group"
-                >Số điện thoại người giám hộ/đại diện<input
+                >Số điện thoại người giám hộ<input
                   name="guardian_phone"
                   inputmode="tel"
               /></label>
               <label class="input-group"
                 >Quan hệ với người đề nghị<input name="guardian_relationship"
               /></label>
-              <label
-                class="input-group template-fields"
-                data-template="tro_cap_huu_tri"
-                ><span>Ngày sinh người giám hộ</span
-                ><input
-                  name="guardian_date_of_birth"
-                  placeholder="dd/mm/yyyy"
-                  inputmode="numeric"
-              /></label>
-              <label
-                class="input-group wide template-fields"
-                data-template="tro_cap_huu_tri"
-                ><span>Địa chỉ người giám hộ</span
-                ><input name="guardian_address"
-              /></label>
-              <label
-                class="input-group wide template-fields"
-                data-template="xac_dinh_khuyet_tat"
-                hidden
-                ><span>Hộ khẩu thường trú người đại diện</span
-                ><input name="guardian_residence_address"
-              /></label>
-              <label
-                class="input-group wide template-fields"
-                data-template="xac_dinh_khuyet_tat"
-                hidden
-                ><span>Nơi ở hiện nay người đại diện</span
-                ><input name="guardian_current_address"
-              /></label>
             </div>
           </details>
-
-          <div
-            class="form-grid template-fields"
-            data-template="xac_dinh_khuyet_tat"
-            hidden
-          >
-            <label class="input-group wide"
-              >Nội dung đề nghị <em>*</em>
-              <select name="disability_procedure_type" required>
-                <option value="">-- Chọn nội dung đề nghị --</option>
-                <option>Xác định mức độ khuyết tật và cấp Giấy xác nhận khuyết tật</option>
-                <option>Xác định lại mức độ khuyết tật và cấp Giấy xác nhận khuyết tật</option>
-                <option>Cấp lại Giấy xác nhận khuyết tật</option>
-                <option>Cấp đổi Giấy xác nhận khuyết tật</option>
-              </select>
-            </label>
-          </div>
 
           <div class="generate-row">
             <div>
