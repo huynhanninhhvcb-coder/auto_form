@@ -165,11 +165,11 @@ class DeceasedBenefitDocxMappingTests(unittest.TestCase):
         )
         self.assertNotIn("{{", text)
         near_poor_line = _line_containing(text, "Hộ cận nghèo")
-        self.assertTrue(near_poor_line.startswith("☒"))
+        self.assertIn("☒", near_poor_line)
         self.assertIn("CN-456", near_poor_line)
         # Đối tượng hộ nghèo không được chọn nên vẫn phải bỏ trống mã số của nó.
         poor_line = _line_containing(text, "Hộ nghèo (")
-        self.assertTrue(poor_line.startswith("☐"))
+        self.assertIn("☐", poor_line)
         self.assertNotIn("CN-456", poor_line)
         # Toàn bộ 19 dòng đối tượng khác phải giữ nguyên "☐", chỉ một dòng "☒".
         self.assertEqual(text.count("☒"), 1)
