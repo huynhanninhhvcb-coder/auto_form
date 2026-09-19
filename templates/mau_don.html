@@ -17,6 +17,7 @@
         border-radius: var(--radius-lg);
         margin-bottom: 26px;
         box-shadow: var(--shadow-md);
+        animation: fadeInUp .5s var(--ease-smooth) both;
       }
       .mau-don-header h1 { font-family: var(--font-display); font-size: 1.3rem; margin: 0; }
       .mau-don-header p { margin: 6px 0 0; opacity: .92; font-size: .92rem; }
@@ -42,11 +43,15 @@
         color: var(--ink);
         box-shadow: var(--shadow-sm);
         transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+        animation: fadeInUp .4s var(--ease-smooth) both;
       }
       .mau-don-folder:hover {
         transform: translateY(-3px);
         box-shadow: var(--shadow-md);
         border-color: var(--brand);
+      }
+      .mau-don-folder:active {
+        transform: translateY(-1px) scale(.98);
       }
       .mau-don-folder-icon { font-size: 1.7rem; flex: 0 0 auto; }
       .mau-don-folder-name { color: var(--brand-dark); }
@@ -97,5 +102,6 @@
 
       <a href="/" class="mau-don-back">← Quay lại Auto Form</a>
     </main>
+    <script src="{{ url_for('static', filename='js/ripple.js') }}" defer></script>
   </body>
 </html>
