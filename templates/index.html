@@ -7,11 +7,12 @@
       name="description"
       content="Trích xuất thông tin từ PDF hoặc ảnh để hỗ trợ điền biểu mẫu hành chính."
     />
-    <meta name="theme-color" content="#cf7856" />
+    <meta name="theme-color" content="#ec1625" />
     <title>Điền đơn hỗ trợ | Auto Form</title>
+    <!-- Favicon nhúng trực tiếp dạng SVG data URI (dấu tick trên nền màu thương hiệu), không cần tệp ảnh riêng -->
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23cf7856'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+      href="{{ url_for('static', filename='images/Picture1.png') }}"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,21 +31,38 @@
   </head>
   <body>
     <main class="container">
+      <header class="site-header" aria-label="Trung tâm phục vụ hành chính công">
+        <img
+          class="site-logo"
+          src="{{ url_for('static', filename='images/Picture1.png') }}"
+          alt="Trung tâm phục vụ hành chính công phường Minh Phụng – Hành chính phục vụ"
+        />
+        <div class="site-heading">
+          <div>
+            <h1>Trợ lý điền đơn hành chính</h1>
+            <p>Quét giấy tờ hoặc phỏng vấn bằng giọng nói</p>
+          </div>
+          <span class="online-status"><i aria-hidden="true"></i>Đang hoạt động</span>
+        </div>
+      </header>
+      <!-- Khối giới thiệu đầu trang: tiêu đề và mô tả ngắn về dịch vụ -->
       <section class="hero" aria-labelledby="page-title">
-        <p class="eyebrow">DỊCH VỤ HỖ TRỢ</p>
-        <h1 id="page-title">Điền đơn tự động</h1>
+        <p class="eyebrow">DỊCH VỤ TRỰC TUYẾN</p>
+        <h2 id="page-title">Điền đơn tự động</h2>
         <p>
           Tải giấy tờ để trích xuất thông tin hoặc trả lời từng câu hỏi với trợ
           lý để tạo đơn.
         </p>
       </section>
 
+      <!-- Thanh hiển thị 3 bước thực hiện (chỉ mang tính minh họa, không có logic JS gắn trực tiếp ở đây) -->
       <ol class="steps" aria-label="Các bước thực hiện">
         <li><span>1</span>Cung cấp thông tin</li>
         <li><span>2</span>Kiểm tra thông tin</li>
         <li><span>3</span>Tải biểu mẫu</li>
       </ol>
 
+      <!-- BƯỚC 1: Thẻ chọn nguồn dữ liệu đầu vào - có 2 cách: tải ảnh/PDF để quét hoặc dùng trợ lý phỏng vấn bằng giọng nói -->
       <section class="card upload-card" aria-labelledby="upload-title">
         <div class="section-heading">
           <div>
