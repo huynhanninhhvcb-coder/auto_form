@@ -643,6 +643,7 @@ select:focus, input:focus { background: #fff; border-color: #f4a2ad; box-shadow:
 .input-group input:focus, .input-group select:focus { background: #fff; }
 .bank-details, .optional-fields { border-color: #f1e7e9; background: #fffafa; }
 .generate-row { border-color: #ffe0e4; background: linear-gradient(130deg, #fff7f8, #fff0f2); }
+.generate-row .button .button-label { color: #fff; }
 
 #status.success { color: #136e49; border-left-color: #0ab965; background: #effbf5; }
 footer { color: #8c8c98; }
